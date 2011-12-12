@@ -409,11 +409,11 @@ class HMM_GMM /*{{{*/
 };/*}}}*/
 
 
-void SaveHMMGMG( string filename, HMM_GMM &model);
-void LoadHMMGMG( string filename, HMM_GMM *model, vector<GaussianMixture*> p_statePool[2], vector<Gaussian*> p_gaussPool[2]);
-void LoadHMMGMG( string filename, HMM_GMM *model, vector<GaussianMixture*> &statePool, vector<Gaussian*> &gaussPool);
-bool DeleteState( int idx, HMM_GMM &model, set<int> &recycle_state, set<int> &recycle_gauss );
-void RemoveTrash( HMM_GMM &model, vector<GaussianMixture*> *statePool, vector<Gaussian*> *gaussPool, set<int> &recycle_state, set<int> &recycle_gauss );
+void SaveHMMGMG(string filename, HMM_GMM &model);
+void LoadHMMGMG(string filename, HMM_GMM *model, vector<GaussianMixture*> p_statePool[2], vector<Gaussian*> p_gaussPool[2]);
+void LoadHMMGMG(string filename, HMM_GMM *model, vector<GaussianMixture*> &statePool, vector<Gaussian*> &gaussPool);
+bool DeleteState(unsigned idx, HMM_GMM &model, set<int> &recycle_state, set<int> &recycle_gauss );
+void RemoveTrash(HMM_GMM &model, vector<GaussianMixture*> *statePool, vector<Gaussian*> *gaussPool, set<int> &recycle_state, set<int> &recycle_gauss);
 /************************************************
  * NewStateCopy(...) will call GetState() to 
  * append at the end of pStatePool (might also 
@@ -423,14 +423,14 @@ void RemoveTrash( HMM_GMM &model, vector<GaussianMixture*> *statePool, vector<Ga
  *          => model.getpStatePool(UNUSE)[nsid]
  * (copy Gaussian mixture, too)
  ************************************************/
-int NewStateCopy( int sid, HMM_GMM &model, set<int> *p_state_recycler, set<int> *p_gauss_recycler);
+int NewStateCopy(int sid, HMM_GMM &model, set<int> *p_state_recycler, set<int> *p_gauss_recycler);
 /************************************************
  * GetState(...) append new USE|UNUSE states in 
  * model.getpStatePool(USE|UNUSE)[nsid] with 
  * specified `dim', call nummix times of GetGaussian(),
  * and return `nsid'.
  ************************************************/
-int GetState( HMM_GMM &model, set<int> *p_state_recycler, set<int> *p_gauss_recycler, const int dim, const int num_mix );
-int GetGaussian( HMM_GMM &model, set<int> *p_gauss_recycler, int dim );
+int GetState(HMM_GMM &model, set<int> *p_state_recycler, set<int> *p_gauss_recycler, const int dim, const int num_mix );
+int GetGaussian(HMM_GMM &model, set<int> *p_gauss_recycler, int dim );
 
 #endif

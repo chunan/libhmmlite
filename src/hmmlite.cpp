@@ -148,7 +148,7 @@ void Labfile::LoadFile(string filename) {/*{{{*/
   fs.close();
 }/*}}}*/
 
-void  Labfile::SaveLab(ofstream &fs) {/*{{{*/
+void Labfile::SaveLab(ofstream &fs) {/*{{{*/
   assert(start_f.size() == static_cast<unsigned>(num_lab));
   assert(end_f.size() == static_cast<unsigned>(num_lab));
   assert(cluster.size() == static_cast<unsigned>(num_lab));
@@ -2681,9 +2681,7 @@ LoadHMMGMG(/*{{{*/
   fclose(fp);
 }/*}}}*/
 
-  bool 
-DeleteState(unsigned idx, HMM_GMM &model, set<int> &state_recycler, set<int> &gauss_recycler)/*{{{*/
-{
+bool DeleteState(unsigned idx, HMM_GMM &model, set<int> &state_recycler, set<int> &gauss_recycler) {/*{{{*/ 
   cout << "Deleting state index " << idx << " in statePool\n";
   if (state_recycler.find(idx) != state_recycler.end()) {
     cerr << "Error: statePool[" << idx << "] is already in recycler\n";
