@@ -154,7 +154,7 @@ void Labfile::SaveLab(ofstream &fs) {/*{{{*/
   assert(cluster.size() == static_cast<unsigned>(num_lab));
 
   for (int i = 0; i < num_lab; i++)
-    fs << start_f[i] << ' ' << end_f[i] << " c" << cluster[i] << endl;
+    fs << start_f[i] << ' ' << end_f[i] << ' ' << cluster[i] << endl;
   fs.close();
 }/*}}}*/
 
