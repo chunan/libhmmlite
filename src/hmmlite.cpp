@@ -82,10 +82,10 @@ double LSub(double x, double y)/*{{{*/
 {
   double diff,z;
 
-  if (x < y)    
+  if (x < y)
     ErrorExit(__FILE__,__LINE__,-1,"LSub() get negative result\n");
   diff = y - x;
-  if (diff < MINEARG) 
+  if (diff < MINEARG)
     return (x <= LSMALL) ? LZERO : x ;
   else {
     z = 1.0 - exp(diff);
@@ -95,7 +95,7 @@ double LSub(double x, double y)/*{{{*/
 
 double LDiv(double loga, double logb)/*{{{*/
 {
-  if (logb <= LSMALL) 
+  if (logb <= LSMALL)
     ErrorExit(__FILE__,__LINE__,-1,"LDiv divide by LZERO");
   double z = loga - logb;
   return (z <= LSMALL) ? LZERO : z;
@@ -131,7 +131,7 @@ void Labfile::LoadFile(string filename) {/*{{{*/
     exit(-1);
   }
   while (fs >> s_val) {
-    if (! (fs >> e_val)) 
+    if (! (fs >> e_val))
       ErrorExit(__FILE__,__LINE__,1,"label file break at line %d\n",num_lab);
     if (! (fs >> c_val))
       ErrorExit(__FILE__,__LINE__,1,"label file break at line %d\n",num_lab);
@@ -179,7 +179,7 @@ void Labfile::condense()/*{{{*/
   vector<int>::iterator s_i = start_f.begin() + 1;
   vector<int>::iterator e_i = end_f.begin() + 1;
   vector<int>::iterator c_i = cluster.begin() + 1;
-  while (c_i != cluster.end()) 
+  while (c_i != cluster.end())
   {
     if (*c_i == *(c_i - 1)) {
       *(e_i - 1) = *e_i;
@@ -246,10 +246,9 @@ Gaussian::Gaussian(const Gaussian &g)/*{{{*/
   logConst = g.logConst;
 }/*}}}*/
 
-  void 
-Gaussian::Init()/*{{{*/
+void Gaussian::Init()/*{{{*/
 {
-  dim = 0; 
+  dim = 0;
   p_mean = 0;
   p_cov = 0;
   p_icov = 0;
@@ -263,8 +262,7 @@ Gaussian::Init()/*{{{*/
   pthread_mutex_init(&G_mutex, &attr);
 }/*}}}*/
 
-  void
-Gaussian::AllocateMem(int d)/*{{{*/
+void Gaussian::AllocateMem(int d)/*{{{*/
 {
   if (d <= 0) return;
   if (d != dim) {
@@ -277,8 +275,7 @@ Gaussian::AllocateMem(int d)/*{{{*/
   ClearGaussian();
 }/*}}}*/
 
-  double
-Gaussian::InvertCov()/*{{{*/
+double Gaussian::InvertCov()/*{{{*/
 {
   pthread_mutex_lock(&G_mutex);
 
@@ -298,8 +295,7 @@ Gaussian::InvertCov()/*{{{*/
   return logdet;
 }/*}}}*/
 
-void
-  Gaussian::AddData/*{{{*/
+  void Gaussian::AddData/*{{{*/
 (const double *data, const int dim, const double prob, UpdateType udtype)
 {
   if (!(prob >= 0)) {
@@ -329,8 +325,7 @@ void
 
 }/*}}}*/
 
-  void
-Gaussian::AddMeanCov(const Gaussian &g)/*{{{*/
+void Gaussian::AddMeanCov(const Gaussian &g)/*{{{*/
 {
 
   pthread_mutex_lock(&G_mutex);
@@ -341,8 +336,7 @@ Gaussian::AddMeanCov(const Gaussian &g)/*{{{*/
   pthread_mutex_unlock(&G_mutex);
 }/*}}}*/
 
-  void
-Gaussian::ClearGaussian()/*{{{*/
+void Gaussian::ClearGaussian()/*{{{*/
 {
 
   pthread_mutex_lock(&G_mutex);
@@ -356,8 +350,7 @@ Gaussian::ClearGaussian()/*{{{*/
 
 }/*}}}*/
 
-  void
-Gaussian::AddVarFloor()/*{{{*/
+void Gaussian::AddVarFloor()/*{{{*/
 {
   if (VAR_FLOOR < ZERO) return;
 
@@ -370,8 +363,7 @@ Gaussian::AddVarFloor()/*{{{*/
 
 }/*}}}*/
 
-  bool
-Gaussian::normMeanCov(const bool subtractmean, UpdateType udtype, double N)/*{{{*/
+bool Gaussian::normMeanCov(const bool subtractmean, UpdateType udtype, double N)/*{{{*/
 {
 
   if (N < 0) {
@@ -412,8 +404,7 @@ Gaussian::normMeanCov(const bool subtractmean, UpdateType udtype, double N)/*{{{
 
 }/*}}}*/
 
-  const Gaussian &
-Gaussian::operator=(const Gaussian &g)/*{{{*/
+const Gaussian & Gaussian::operator=(const Gaussian &g)/*{{{*/
 {
   pthread_mutex_lock(&G_mutex);
 
@@ -429,8 +420,7 @@ Gaussian::operator=(const Gaussian &g)/*{{{*/
   return *this;
 }/*}}}*/
 
-double Gaussian::Bhat_dist(const Gaussian &g1, const Gaussian &g2)
-{/*{{{*/
+double Gaussian::Bhat_dist(const Gaussian &g1, const Gaussian &g2) {/*{{{*/
   assert(g1.dim == g2.dim);
   double dist;
   dim = g1.dim;
@@ -447,8 +437,7 @@ double Gaussian::Bhat_dist(const Gaussian &g1, const Gaussian &g2)
   return dist;
 }/*}}}*/
 
-  void
-Gaussian::CopyMean(const Gaussian &g)/*{{{*/
+void Gaussian::CopyMean(const Gaussian &g)/*{{{*/
 {
   pthread_mutex_lock(&G_mutex);
 
@@ -459,8 +448,7 @@ Gaussian::CopyMean(const Gaussian &g)/*{{{*/
 
 }/*}}}*/
 
-  void
-Gaussian::CopyCov(const Gaussian &g)/*{{{*/
+void Gaussian::CopyCov(const Gaussian &g)/*{{{*/
 {
   pthread_mutex_lock(&G_mutex);
 
@@ -473,8 +461,7 @@ Gaussian::CopyCov(const Gaussian &g)/*{{{*/
 
 }/*}}}*/
 
-  void
-Gaussian::backoff(const Gaussian &g, double backoff_weight)/*{{{*/
+void Gaussian::backoff(const Gaussian &g, double backoff_weight)/*{{{*/
 {
   if (backoff_weight < ZERO) return;
   assert(dim = g.dim);
@@ -527,8 +514,7 @@ Gaussian::backoff(const Gaussian &g, double backoff_weight)/*{{{*/
 
 }/*}}}*/
 
-double 
-Gaussian::logProb(const double *data, const int dim, const bool islog) const/*{{{*/
+double Gaussian::logProb(const double *data, const int dim, const bool islog) const/*{{{*/
 {
   double logpr = logConst - 0.5 * Bhat(data, p_mean->pointer(), dim);
 
@@ -537,8 +523,7 @@ Gaussian::logProb(const double *data, const int dim, const bool islog) const/*{{
 
 }/*}}}*/
 
-double 
-Gaussian::Bhat(const double *data1, const double *data2, const int dim) const/*{{{*/
+double Gaussian::Bhat(const double *data1, const double *data2, const int dim) const/*{{{*/
 {
   /* Memory arrangement */
   double *data_hat = new double[dim];
@@ -557,8 +542,7 @@ Gaussian::Bhat(const double *data1, const double *data2, const int dim) const/*{
 
 }/*}}}*/
 
-void
-Gaussian::display(FILE *fp) const /*{{{*/
+void Gaussian::display(FILE *fp) const /*{{{*/
 {
   fprintf(fp,"Gaussian ascii\n");
 
@@ -592,8 +576,7 @@ Gaussian::display(FILE *fp) const /*{{{*/
   //#endif
 }/*}}}*/
 
-double
-Gaussian::getTotalVar() const/*{{{*/
+double Gaussian::getTotalVar() const/*{{{*/
 {
   double totvar = 0.0;
   for (int d = 0; d < getDim(); d++) {
@@ -603,8 +586,7 @@ Gaussian::getTotalVar() const/*{{{*/
 
 }/*}}}*/
 
-  void
-GaussianMixture::Init(int d, int x, vector<Gaussian *> *p)/*{{{*/
+void GaussianMixture::Init(int d, int x, vector<Gaussian *> *p)/*{{{*/
 {
   dim = d;
   v_weight.resize(x);
@@ -617,8 +599,7 @@ GaussianMixture::Init(int d, int x, vector<Gaussian *> *p)/*{{{*/
 
 }/*}}}*/
 
-  const GaussianMixture & 
-GaussianMixture::operator=(const GaussianMixture & gm)/*{{{*/
+const GaussianMixture & GaussianMixture::operator=(const GaussianMixture & gm)/*{{{*/
 {
   assert(dim == gm.dim);
   assert(v_weight.size() == gm.v_weight.size());
@@ -638,7 +619,7 @@ GaussianMixture::operator=(const GaussianMixture & gm)/*{{{*/
 }/*}}}*/
 
 void GaussianMixture::setGaussIdx(unsigned x, unsigned idx) { /*{{{*/
-  assert(x < v_weight.size() && pGaussPool != 0 && idx < pGaussPool->size()); 
+  assert(x < v_weight.size() && pGaussPool != 0 && idx < pGaussPool->size());
 
   pthread_mutex_lock(&S_mutex);
 
@@ -647,8 +628,7 @@ void GaussianMixture::setGaussIdx(unsigned x, unsigned idx) { /*{{{*/
   pthread_mutex_unlock(&S_mutex);
 }/*}}}*/
 
-  void 
-GaussianMixture::copyGaussIdx(const GaussianMixture *pstate)  /*{{{*/
+void GaussianMixture::copyGaussIdx(const GaussianMixture *pstate)  /*{{{*/
 {
   pthread_mutex_lock(&S_mutex);
 
@@ -657,8 +637,7 @@ GaussianMixture::copyGaussIdx(const GaussianMixture *pstate)  /*{{{*/
   pthread_mutex_unlock(&S_mutex);
 }/*}}}*/
 
-  void 
-GaussianMixture::setWeight(int x, double val, SetType s) /*{{{*/
+void GaussianMixture::setWeight(int x, double val, SetType s) /*{{{*/
 {
   pthread_mutex_lock(&S_mutex);
 
@@ -669,16 +648,14 @@ GaussianMixture::setWeight(int x, double val, SetType s) /*{{{*/
   pthread_mutex_unlock(&S_mutex);
 }/*}}}*/
 
-  void 
-GaussianMixture::copyWeight(GaussianMixture &s)/*{{{*/
-{ 
+void GaussianMixture::copyWeight(GaussianMixture &s)/*{{{*/
+{
   assert(v_gaussidx.size() <= s.v_gaussidx.size());
   for (unsigned x = 0; x < v_gaussidx.size(); x++)
     setWeight(x, s.getWeight(x),SET);
 }/*}}}*/
 
-  void
-GaussianMixture::UniformWeight()/*{{{*/
+void GaussianMixture::UniformWeight()/*{{{*/
 {
   if (v_weight.empty()) return;
   double w = 1.0 / static_cast<double>(v_weight.size());
@@ -686,16 +663,14 @@ GaussianMixture::UniformWeight()/*{{{*/
     v_weight[x] = w;
 }/*}}}*/
 
-  bool
-GaussianMixture::containGidx(int gidx)/*{{{*/
+bool GaussianMixture::containGidx(int gidx)/*{{{*/
 {
   for (unsigned x = 0; x < v_gaussidx.size(); x++)
     if (v_gaussidx[x] == gidx) return true;
   return false;
 }/*}}}*/
 
-  bool 
-GaussianMixture::cancelGaussIdx(int idx)/*{{{*/
+bool GaussianMixture::cancelGaussIdx(int idx)/*{{{*/
 {
   pthread_mutex_lock(&S_mutex);
 
@@ -712,8 +687,7 @@ GaussianMixture::cancelGaussIdx(int idx)/*{{{*/
   return true;
 }/*}}}*/
 
-  void
-GaussianMixture::ClearWeight()/*{{{*/
+void GaussianMixture::ClearWeight()/*{{{*/
 {
   pthread_mutex_lock(&S_mutex);
 
@@ -722,8 +696,7 @@ GaussianMixture::ClearWeight()/*{{{*/
   pthread_mutex_unlock(&S_mutex);
 }/*}}}*/
 
-  bool
-GaussianMixture::normWeight(double & weightsum)/*{{{*/
+bool GaussianMixture::normWeight(double & weightsum)/*{{{*/
 {
 
   weightsum = 0.0;
@@ -753,7 +726,7 @@ void GaussianMixture::display(FILE *fp) const/*{{{*/
   fprintf(fp, "nmix: %d\n", static_cast<int>(v_weight.size()));
 
   fprintf(fp, "weight:");
-  for (unsigned x = 0; x < v_weight.size(); x++) 
+  for (unsigned x = 0; x < v_weight.size(); x++)
     fprintf(fp, " %g", v_weight[x]);
   fprintf(fp, "\n");
 
@@ -782,8 +755,7 @@ void HMM_GMM::Init()/*{{{*/
   isLog = false;
 }/*}}}*/
 
-  void
-HMM_GMM::CopyForThread(const HMM_GMM &model)/*{{{*/
+void HMM_GMM::CopyForThread(const HMM_GMM &model)/*{{{*/
 {
   i_nstate = model.i_nstate;
   use = model.use;
@@ -814,8 +786,7 @@ HMM_GMM::CopyForThread(const HMM_GMM &model)/*{{{*/
 
 }/*}}}*/
 
-void 
-HMM_GMM::dump_param() const/*{{{*/
+void HMM_GMM::dump_param() const/*{{{*/
 {
   cout << "Num. of state = " << i_nstate << endl
     << "Parameter in use = " << use << endl;
@@ -848,8 +819,7 @@ HMM_GMM::dump_param() const/*{{{*/
 
 }/*}}}*/
 
-void 
-HMM_GMM::display(FILE *fp) const/*{{{*/
+void HMM_GMM::display(FILE *fp) const/*{{{*/
 {
   fprintf(fp,"HMM ascii\n");
 
@@ -909,58 +879,50 @@ HMM_GMM::display(FILE *fp) const/*{{{*/
 
 }/*}}}*/
 
-int 
-HMM_GMM::getGMidx(int s) const {/*{{{*/
-  assert(s < i_nstate); 
+int HMM_GMM::getGMidx(int s) const {/*{{{*/
+  assert(s < i_nstate);
   return v_state[s];
 }/*}}}*/
 
-GaussianMixture *
-HMM_GMM::getpGM(int s, UseType u) const /*{{{*/
+GaussianMixture * HMM_GMM::getpGM(int s, UseType u) const /*{{{*/
 {
-  assert(s < i_nstate); 
+  assert(s < i_nstate);
   int who = (u == USE) ? use : 1-use;
-  return pStatePool[who]->operator[](v_state[s]); 
+  return pStatePool[who]->operator[](v_state[s]);
 }/*}}}*/
 
-double 
-HMM_GMM::getPi(int s, UseType u) const /*{{{*/
+double HMM_GMM::getPi(int s, UseType u) const /*{{{*/
 {
-  assert(s < i_nstate); 
-  if (u == USE) return pi[use][s]; 
+  assert(s < i_nstate);
+  if (u == USE) return pi[use][s];
   else return pi[1-use][s];
 }/*}}}*/
 
-double 
-HMM_GMM::getTrans(int i, int j) const /*{{{*/
+double HMM_GMM::getTrans(int i, int j) const /*{{{*/
 {
-  assert(i<i_nstate && j<i_nstate); 
+  assert(i<i_nstate && j<i_nstate);
   return v_trans[i][j];
 }/*}}}*/
 
-double 
-HMM_GMM::getRTrans(int i, int j) const /*{{{*/
+double HMM_GMM::getRTrans(int i, int j) const /*{{{*/
 {
-  assert(i<i_nstate && j<i_nstate); 
+  assert(i<i_nstate && j<i_nstate);
   return v_rtrans[i][j];
 }/*}}}*/
 
-vector<GaussianMixture *> *
-HMM_GMM::getpStatePool(UseType u) const /*{{{*/
+vector<GaussianMixture *> * HMM_GMM::getpStatePool(UseType u) const /*{{{*/
 {
   if (u == USE) return pStatePool[use];
   else return pStatePool[1-use];
 }/*}}}*/
 
-vector<Gaussian *> *
-HMM_GMM::getpGaussPool(UseType u) const /*{{{*/
+vector<Gaussian *> * HMM_GMM::getpGaussPool(UseType u) const /*{{{*/
 {
   if (u == USE) return pGaussPool[use];
   else return pGaussPool[1-use];
 }/*}}}*/
 
-  void
-HMM_GMM::setNstate(int n)/*{{{*/
+void HMM_GMM::setNstate(int n)/*{{{*/
 {
   i_nstate = n;
   v_state.resize(n);
@@ -979,59 +941,52 @@ HMM_GMM::setNstate(int n)/*{{{*/
   }
 }/*}}}*/
 
-void 
-HMM_GMM::setState(unsigned s, unsigned idx) { /*{{{*/
+void HMM_GMM::setState(unsigned s, unsigned idx) { /*{{{*/
   assert(static_cast<int>(s) < i_nstate);
-  assert(pStatePool[0] != 0 && idx < pStatePool[0]->size() && 
-      pStatePool[1] != 0 && idx < pStatePool[1]->size());
+  assert(pStatePool[0] != 0 && idx < pStatePool[0]->size() &&
+         pStatePool[1] != 0 && idx < pStatePool[1]->size());
   v_state[s] = idx;
 } /*}}}*/
 
-void 
-HMM_GMM::setPi(int s, double val, UseType u) {/*{{{*/
-  assert(s < i_nstate); 
+void HMM_GMM::setPi(int s, double val, UseType u) {/*{{{*/
+  assert(s < i_nstate);
   pthread_mutex_lock(&H_mutex);
-  if (u == USE) pi[use][s] = val; 
-  else pi[1-use][s] = val; 
+  if (u == USE) pi[use][s] = val;
+  else pi[1-use][s] = val;
   pthread_mutex_unlock(&H_mutex);
 }/*}}}*/
 
-  void
-HMM_GMM::UniformPi()/*{{{*/
-{ 
+void HMM_GMM::UniformPi()/*{{{*/
+{
   if (i_nstate <= 0) return;
   double share_p = 1.0 / double(i_nstate);
   for (int i = 0; i < i_nstate; i++)
     pi[use][i] = share_p;
 }/*}}}*/
 
-void 
-HMM_GMM::addPi(int s, double val, UseType u) {/*{{{*/
-  assert(s < i_nstate); 
+void HMM_GMM::addPi(int s, double val, UseType u) {/*{{{*/
+  assert(s < i_nstate);
   pthread_mutex_lock(&H_mutex);
-  if (u == USE) pi[use][s] += val; 
-  else pi[1-use][s] += val; 
+  if (u == USE) pi[use][s] += val;
+  else pi[1-use][s] += val;
   pthread_mutex_unlock(&H_mutex);
 }/*}}}*/
 
-void 
-HMM_GMM::setTrans(int i, int j, double val) { /*{{{*/
-  assert(i<i_nstate && j<i_nstate); 
+void HMM_GMM::setTrans(int i, int j, double val) { /*{{{*/
+  assert(i<i_nstate && j<i_nstate);
   pthread_mutex_lock(&H_mutex);
-  v_trans[i][j] = val; 
+  v_trans[i][j] = val;
   pthread_mutex_unlock(&H_mutex);
 }/*}}}*/
 
-void 
-HMM_GMM::addTrans(int i, int j, double val) { /*{{{*/
-  assert(i<i_nstate && j<i_nstate); 
+void HMM_GMM::addTrans(int i, int j, double val) { /*{{{*/
+  assert(i<i_nstate && j<i_nstate);
   pthread_mutex_lock(&H_mutex);
-  v_trans[i][j] += val; 
+  v_trans[i][j] += val;
   pthread_mutex_unlock(&H_mutex);
 }/*}}}*/
 
-  void 
-HMM_GMM::setLeft(int s, int L)/*{{{*/
+void HMM_GMM::setLeft(int s, int L)/*{{{*/
 {
   assert(s >= 0 && s < i_nstate);
   assert(L == -1 || (L >= 0 && L < i_nstate));
@@ -1039,8 +994,7 @@ HMM_GMM::setLeft(int s, int L)/*{{{*/
   left[s] = L;
 }/*}}}*/
 
-  void 
-HMM_GMM::setRight(int s, int R)/*{{{*/
+void HMM_GMM::setRight(int s, int R)/*{{{*/
 {
   assert(s >= 0 && s < i_nstate);
   assert(R == -1 || (R >= 0 && R < i_nstate));
@@ -1048,8 +1002,7 @@ HMM_GMM::setRight(int s, int R)/*{{{*/
   right[s] = R;
 }/*}}}*/
 
-  void 
-HMM_GMM::deleteState(int i)/*{{{*/
+void HMM_GMM::deleteState(int i)/*{{{*/
 {
   //cout << "HMM_GMM::deleteState(" << i << ")\n";
   assert(i >= 0 && i < i_nstate);
@@ -1061,7 +1014,7 @@ HMM_GMM::deleteState(int i)/*{{{*/
   for (unsigned j = 0; j < left.size(); j++) {
     /* case: i->j */
     if (left[j] == i) {
-      cerr << "Warning: following state s" << j 
+      cerr << "Warning: following state s" << j
         << ". Make sure it will be deleted after this operation"
         << endl;
       left[j] = -1;
@@ -1092,8 +1045,7 @@ HMM_GMM::deleteState(int i)/*{{{*/
   i_nstate--;
 }/*}}}*/
 
-  bool
-HMM_GMM::deleteStateIdx(int idx)/*{{{*/
+bool HMM_GMM::deleteStateIdx(int idx)/*{{{*/
 {
   //cout << "HMM_GMM::deleteStateIdx(" << idx << ")\n";
   int i = 0;
@@ -1106,8 +1058,7 @@ HMM_GMM::deleteStateIdx(int idx)/*{{{*/
   return false;
 }/*}}}*/
 
-  bool
-HMM_GMM::cancelStateIdx(int idx)/*{{{*/
+bool HMM_GMM::cancelStateIdx(int idx)/*{{{*/
 {
   for (int i = 0; i < i_nstate; i++)
     if (v_state[i] > idx) v_state[i]--;
@@ -1212,7 +1163,7 @@ void HMM_GMM::EMInitIter() /*{{{*/
   /* Number of utterances*/
   /*
      numutt.resize(vGauss.size());
-     for (unsigned g = 0; g < numutt.size(); g++) numutt[g] = 0; 
+     for (unsigned g = 0; g < numutt.size(); g++) numutt[g] = 0;
      */
 
 }/*}}}*/
@@ -1291,7 +1242,7 @@ void HMM_GMM::CalBjOtPxs(int nframe)/*{{{*/
     /* For each Gaussian */
     for (int x = 0; x < mixsize; x++) {
       px_s[j][x].resize(nframe);
-      for (int t = 0; t < nframe; t++) 
+      for (int t = 0; t < nframe; t++)
         px_s[j][x][t] = state->getWeight(x) * bgOt[state->getGaussIdx(x)][t];
       //px_s[j][x][t] = logprod(log(state->getWeight(x)), bgOt[state->getGaussIdx(x)][t]);
     }
@@ -1382,7 +1333,7 @@ void HMM_GMM::CalEpsilon(int nframe)/*{{{*/
 {
   int nframe_1 = nframe-1;
   epsilon.resize(i_nstate);
-  for (int i = 0; i < i_nstate; i++) { 
+  for (int i = 0; i < i_nstate; i++) {
     epsilon[i].resize(i_nstate);
     for (int j = 0; j < i_nstate; j++)
       epsilon[i][j].resize(nframe_1);
@@ -1455,8 +1406,8 @@ void HMM_GMM::CalLogBjOtPxs(int nframe)/*{{{*/
       px_s[j][x].resize(nframe);
       /* For each frame */
       for (int t = 0; t < nframe; t++) {
-        px_s[j][x][t] = LProd(state->getWeight(x), 
-            bgOt[state->getGaussIdx(x)][t]);
+        px_s[j][x][t] = LProd(state->getWeight(x),
+                              bgOt[state->getGaussIdx(x)][t]);
       }
     }
     /* For each frame */
@@ -1471,6 +1422,34 @@ void HMM_GMM::CalLogBjOtPxs(int nframe)/*{{{*/
     }
   }
 }/*}}}*/
+
+void HMM_GMM::CalLogCondToLogPostBjOt() {
+  int nframe = static_cast<int>(bjOt[0].size());
+  for (int t = 0; t < nframe; ++t) {
+    double tot_prob = 0.0;
+    for (int j = 0; j < i_nstate; ++j) {
+      tot_prob += EXP(bjOt[j][t]);
+    }
+    tot_prob = LOG(tot_prob);
+    for (int j = 0; j < i_nstate; ++j) {
+      bjOt[j][t] -= tot_prob;
+    }
+  }
+}
+
+void HMM_GMM::CalLogCondToPostBjOt() {
+  int nframe = static_cast<int>(bjOt[0].size());
+  for (int t = 0; t < nframe; ++t) {
+    double tot_prob = 0.0;
+    for (int j = 0; j < i_nstate; ++j) {
+      bjOt[j][t] = EXP(bjOt[j][t]);
+      tot_prob += bjOt[j][t];
+    }
+    for (int j = 0; j < i_nstate; ++j) {
+      bjOt[j][t] /= tot_prob;
+    }
+  }
+}
 
 void HMM_GMM::CalLogAlpha(int nframe, vector<int> *p_label)/*{{{*/
 {
@@ -1504,8 +1483,8 @@ void HMM_GMM::CalLogAlpha(int nframe, vector<int> *p_label)/*{{{*/
       for (int i = i_start; i < i_end; i++) {
         int sno_i = useLabel ? (*p_label)[i] : i;
         if (v_trans[sno_i][sno_j] <= LSMALL) continue;
-        alpha[j][t] = LAdd(alpha[j][t], 
-            LProd(alpha[i][t-1], v_trans[sno_i][sno_j]));
+        alpha[j][t] = LAdd(alpha[j][t],
+                           LProd(alpha[i][t-1], v_trans[sno_i][sno_j]));
       }
 
       alpha[j][t] = LProd(alpha[j][t], bjOt[sno_j][t]);
@@ -1539,7 +1518,7 @@ void HMM_GMM::CalLogAlphaBound(int nframe, vector<int> *p_endf)/*{{{*/
     for (unsigned j = 0; j < alpha.size(); j++) {
       alpha[j][t] = LZERO;
       // inside a segment
-      if (!isBound) { 
+      if (!isBound) {
         alpha[j][t] = LProd(alpha[j][t-1],v_trans[j][j]);
         if (getLeft(j) != -1) { // Not a head
           for (int i = 0; i < i_nstate; i++) { // Search for all possible links
@@ -1549,7 +1528,7 @@ void HMM_GMM::CalLogAlphaBound(int nframe, vector<int> *p_endf)/*{{{*/
         }
       }
       // between segments
-      else{ 
+      else{
         for (int i = 0; i < i_nstate; i++) {
           if (v_trans[i][j] <= LSMALL) continue;
           alpha[j][t] = LAdd(alpha[j][t], LProd(alpha[i][t-1], v_trans[i][j]));
@@ -1629,7 +1608,7 @@ void HMM_GMM::CalLogBetaBound(int nframe, vector<int> *p_startf)/*{{{*/
   /* Fill the table */
   for (int t = nframe-2; t >= 0; t--) {
     bool isBound = (t+1 == startf[i_start]);
-    if (isBound) { 
+    if (isBound) {
       //cout << "Touch bound " << t << " - " << t+1 << endl;
       i_start--;
     }
@@ -1654,8 +1633,8 @@ void HMM_GMM::CalLogBetaBound(int nframe, vector<int> *p_startf)/*{{{*/
       else{
         for (int j = 0; j < i_nstate; j++) {
           if (v_trans[i][j] <= LSMALL) continue;
-          beta[i][t] = LAdd(beta[i][t], 
-              LProd(v_trans[i][j], nextbeta[j]));
+          beta[i][t] = LAdd(beta[i][t],
+                            LProd(v_trans[i][j], nextbeta[j]));
         }
       }
     }
@@ -1704,7 +1683,7 @@ void HMM_GMM::CalLogEpsilon(int nframe, vector<int> *p_label)/*{{{*/
   bool useLabel = (p_label != NULL);
   int nframe_1 = nframe-1;
   epsilon.resize(alpha.size());
-  for (unsigned i = 0; i < epsilon.size(); i++) { 
+  for (unsigned i = 0; i < epsilon.size(); i++) {
     epsilon[i].resize(alpha.size());
     for (unsigned j = 0; j < epsilon[i].size(); j++)
       epsilon[i][j].resize(nframe_1);
@@ -1735,7 +1714,7 @@ void HMM_GMM::CalLogEpsilonBound(int nframe, vector<int> *p_endf)/*{{{*/
   /* Allocate memory */
   int nframe_1 = nframe-1;
   epsilon.resize(i_nstate);
-  for (unsigned i = 0; i < epsilon.size(); i++) { 
+  for (unsigned i = 0; i < epsilon.size(); i++) {
     epsilon[i].resize(i_nstate);
     for (unsigned j = 0; j < epsilon[i].size(); j++)
       epsilon[i][j].resize(nframe_1);
@@ -1799,7 +1778,7 @@ void HMM_GMM::AccumIJ(int nframe, vector<int> *p_label, double obs_weight)/*{{{*
       for (int t = 0; t < nframe_1; t++)
         // We do not accumulate gamma[i][:] because
         // the sum of accum_ij[i][:] = gamma[i][:].
-        // Hence normalize accum_ij is actually dividing 
+        // Hence normalize accum_ij is actually dividing
         // the sum of gamma[i][:]
         accum_ij[sno_i][sno_j] += obs_weight * epsilon[i][j][t];
     }
@@ -1823,7 +1802,7 @@ void HMM_GMM::AccumWeightGaussian(double **obs, int nframe, int dim, UpdateType 
         if (gamma_i_x_t <= ZERO) continue;
         pg->AddData(obs[t],dim,gamma_i_x_t,udtype);
         // Here we do not divide by sum_gamma[i] because
-        // the total sum of weights in state i is 
+        // the total sum of weights in state i is
         // actually sum_gamma[i]
         state->setWeight(x,gamma_i_x_t, ADD);
       }
@@ -2039,7 +2018,7 @@ void HMM_GMM::EMUpdate(set<int> *p_delete_list, double backoff_weight, UpdateTyp
     if (!state->normWeight(occupation[i])) {
       GaussianMixture *oldstate = getpGM(i,USE);
       state->copyWeight(*oldstate);
-      if (p_delete_list != NULL) 
+      if (p_delete_list != NULL)
         p_delete_list->insert(getGMidx(i));
     }
   }
@@ -2050,7 +2029,7 @@ void HMM_GMM::EMUpdate(set<int> *p_delete_list, double backoff_weight, UpdateTyp
   for (unsigned g = 0; g < vGauss.size(); g++) {
     if (!gauss_isUsed[g]) continue;
     // all backoff
-    if (backoff_weight > 1 - ZERO) { 
+    if (backoff_weight > 1 - ZERO) {
       cerr << "Gaussian[" << g << "] not updated\n";
       *(vGauss[g]) = *(vGauss_old[g]);
       continue;
@@ -2125,7 +2104,7 @@ double HMM_GMM::EMObsLabel(double **obs, int nframe, int dim, vector<int> *p_lab
     int sno_i = (*p_label)[i];
     for (unsigned j = i+1; j-i-1 <= static_cast<unsigned>(allowedNDel) && j < p_label->size(); j++) {
       int sno_j = (*p_label)[j];
-      if (v_trans[ sno_i ][ sno_j ] > LSMALL) { 
+      if (v_trans[ sno_i ][ sno_j ] > LSMALL) {
         can_trans = true;
         break;
       }
@@ -2252,14 +2231,14 @@ double HMM_GMM::CalLogDelta(vector<int> &state_seq, const vector<int> *p_endf) {
   int left_i;
   double newscore;
   for (int t = 1; t < nframe; t++) {
-    if (bndConstraint) { 
+    if (bndConstraint) {
       isBound = (t-1 == (*p_endf)[i_end]);
       if (isBound) i_end++;
     }
     for (int j = 0; j < i_nstate; j++) {
       delta[j][t] = LZERO;
       // inside a segment
-      if (!isBound) { 
+      if (!isBound) {
         delta[j][t] = LProd(delta[j][t-1], v_trans[j][j]);
         path[j][t] = j;
         if ((left_i = getLeft(j)) != -1) {
@@ -2333,8 +2312,7 @@ void Gaussian::SaveGaussian(FILE *fp, const DataType type)/*{{{*/
   fprintf(fp,"EndGaussian\n");
 }/*}}}*/
 
-  void
-Gaussian::LoadGaussian(FILE *fp)/*{{{*/
+void Gaussian::LoadGaussian(FILE *fp)/*{{{*/
 {
   char buff[1024];
   fscanf(fp,"%s",buff);
@@ -2349,8 +2327,7 @@ Gaussian::LoadGaussian(FILE *fp)/*{{{*/
   }
 }/*}}}*/
 
-  void 
-Gaussian::ReadAscii(FILE *fp)/*{{{*/
+void Gaussian::ReadAscii(FILE *fp)/*{{{*/
 {
   char tag[1024];
   int i_val;
@@ -2382,8 +2359,7 @@ Gaussian::ReadAscii(FILE *fp)/*{{{*/
   }
 }/*}}}*/
 
-  void 
-Gaussian::ReadBinary(FILE *fp)/*{{{*/
+void Gaussian::ReadBinary(FILE *fp)/*{{{*/
 {
   char tag[1024];
   int i_val;
@@ -2412,16 +2388,14 @@ Gaussian::ReadBinary(FILE *fp)/*{{{*/
   }
 }/*}}}*/
 
-  void
-GaussianMixture::SaveGaussianMixture(FILE *fp, const DataType type)/*{{{*/
+void GaussianMixture::SaveGaussianMixture(FILE *fp, const DataType type)/*{{{*/
 {
   if (type == BINARY)
     fprintf(stderr,"GaussianMixture::SaveGaussianMixture(): does not support binary\n");
   display(fp);
 }/*}}}*/
 
-  void
-GaussianMixture::LoadGaussianMixture(FILE *fp)/*{{{*/
+void GaussianMixture::LoadGaussianMixture(FILE *fp)/*{{{*/
 {
   char buff[1024];
   fscanf(fp,"%s",buff);
@@ -2436,8 +2410,7 @@ GaussianMixture::LoadGaussianMixture(FILE *fp)/*{{{*/
   }
 }/*}}}*/
 
-  void 
-GaussianMixture::ReadAscii(FILE *fp)/*{{{*/
+void GaussianMixture::ReadAscii(FILE *fp)/*{{{*/
 {
   char tag[1024];
   int i_val;
@@ -2469,22 +2442,19 @@ GaussianMixture::ReadAscii(FILE *fp)/*{{{*/
   }
 }/*}}}*/
 
-  void 
-GaussianMixture::ReadBinary(FILE *fp)/*{{{*/
+void GaussianMixture::ReadBinary(FILE *fp)/*{{{*/
 {
   fprintf(stderr,"Error: GaussianMixture::ReadBinary(FILE *fp) is not implemented.\n");
 }/*}}}*/
 
-  void
-HMM_GMM::SaveHMM(FILE *fp, const DataType type)/*{{{*/
+void HMM_GMM::SaveHMM(FILE *fp, const DataType type)/*{{{*/
 {
   if (type == BINARY)
     fprintf(stderr,"HMM_GMM::SaveHMM(): does not support binary\n");
   display(fp);
 }/*}}}*/
 
-  void
-HMM_GMM::LoadHMM(FILE *fp)/*{{{*/
+void HMM_GMM::LoadHMM(FILE *fp)/*{{{*/
 {
   char buff[1024];
   fscanf(fp,"%s",buff);
@@ -2499,14 +2469,12 @@ HMM_GMM::LoadHMM(FILE *fp)/*{{{*/
   }
 }/*}}}*/
 
-  void 
-HMM_GMM::ReadBinary(FILE *fp)/*{{{*/
+void HMM_GMM::ReadBinary(FILE *fp)/*{{{*/
 {
   fprintf(stderr,"Error: HMM_GMM::ReadBinary(FILE *fp) is not implemented.\n");
 }/*}}}*/
 
-  void 
-HMM_GMM::ReadAscii(FILE *fp)/*{{{*/
+void HMM_GMM::ReadAscii(FILE *fp)/*{{{*/
 {
   char tag[1024];
   int i_val;
@@ -2562,8 +2530,7 @@ HMM_GMM::ReadAscii(FILE *fp)/*{{{*/
   }
 }/*}}}*/
 
-  void 
-SaveHMMGMG(string filename, HMM_GMM &model)/*{{{*/
+void SaveHMMGMG(string filename, HMM_GMM &model)/*{{{*/
 {
   vector<GaussianMixture*> &statePool = *(model.getpStatePool(USE));
   vector<Gaussian*> &gaussPool = *(model.getpGaussPool(USE));
@@ -2582,8 +2549,7 @@ SaveHMMGMG(string filename, HMM_GMM &model)/*{{{*/
   fclose(fp);
 }/*}}}*/
 
-void 
-LoadHMMGMG(/*{{{*/
+void LoadHMMGMG(/*{{{*/
     string filename,
     HMM_GMM *p_model,
     vector<GaussianMixture*> *statePool,
@@ -2636,8 +2602,7 @@ LoadHMMGMG(/*{{{*/
 
 }/*}}}*/
 
-void 
-LoadHMMGMG(/*{{{*/
+void LoadHMMGMG(/*{{{*/
     string filename,
     HMM_GMM *p_model,
     vector<GaussianMixture*> &statePool,
@@ -2681,7 +2646,7 @@ LoadHMMGMG(/*{{{*/
   fclose(fp);
 }/*}}}*/
 
-bool DeleteState(unsigned idx, HMM_GMM &model, set<int> &state_recycler, set<int> &gauss_recycler) {/*{{{*/ 
+bool DeleteState(unsigned idx, HMM_GMM &model, set<int> &state_recycler, set<int> &gauss_recycler) {/*{{{*/
   cout << "Deleting state index " << idx << " in statePool\n";
   if (state_recycler.find(idx) != state_recycler.end()) {
     cerr << "Error: statePool[" << idx << "] is already in recycler\n";
@@ -2708,10 +2673,9 @@ bool DeleteState(unsigned idx, HMM_GMM &model, set<int> &state_recycler, set<int
   return true;
 }/*}}}*/
 
-  int
-GetGaussian(HMM_GMM &model, set<int> *p_gauss_recycler, int dim)/*{{{*/
+int GetGaussian(HMM_GMM &model, set<int> *p_gauss_recycler, int dim)/*{{{*/
 {
-  vector<Gaussian*> *pgaussPool[2] = 
+  vector<Gaussian*> *pgaussPool[2] =
   { model.getpGaussPool(USE),model.getpGaussPool(UNUSE) };
   int gid;
   if (p_gauss_recycler == NULL || p_gauss_recycler->empty()) {
@@ -2736,12 +2700,11 @@ GetGaussian(HMM_GMM &model, set<int> *p_gauss_recycler, int dim)/*{{{*/
   return gid;
 }/*}}}*/
 
-  int
-GetState(HMM_GMM &model, set<int> *p_state_recycler, set<int> *p_gauss_recycler, const int dim, const int num_mix)/*{{{*/
+int GetState(HMM_GMM &model, set<int> *p_state_recycler, set<int> *p_gauss_recycler, const int dim, const int num_mix)/*{{{*/
 {
-  vector<GaussianMixture*> *pstatePool[2] = 
+  vector<GaussianMixture*> *pstatePool[2] =
   { model.getpStatePool(USE), model.getpStatePool(UNUSE) };
-  vector<Gaussian*> *pgaussPool[2] = 
+  vector<Gaussian*> *pgaussPool[2] =
   { model.getpGaussPool(USE), model.getpGaussPool(UNUSE) };
   assert(pstatePool[0] != NULL);
   assert(pstatePool[1] != NULL);
@@ -2776,8 +2739,7 @@ GetState(HMM_GMM &model, set<int> *p_state_recycler, set<int> *p_gauss_recycler,
   return nsid;
 }/*}}}*/
 
-  int
-NewStateCopy(int sid, HMM_GMM &model, set<int> *p_state_recycler, set<int> *p_gauss_recycler) /*{{{*/
+int NewStateCopy(int sid, HMM_GMM &model, set<int> *p_state_recycler, set<int> *p_gauss_recycler) /*{{{*/
 {
 
   GaussianMixture *state;
@@ -2803,8 +2765,7 @@ NewStateCopy(int sid, HMM_GMM &model, set<int> *p_state_recycler, set<int> *p_ga
   return nsid;
 }/*}}}*/
 
-  void 
-RemoveTrash(HMM_GMM &model, vector<GaussianMixture*> statePool[2], vector<Gaussian*> gaussPool[2], set<int> &state_recycler, set<int> &gauss_recycler)/*{{{*/
+void RemoveTrash(HMM_GMM &model, vector<GaussianMixture*> statePool[2], vector<Gaussian*> gaussPool[2], set<int> &state_recycler, set<int> &gauss_recycler)/*{{{*/
 {
   int idx;
   GaussianMixture *pstate;
@@ -2812,7 +2773,7 @@ RemoveTrash(HMM_GMM &model, vector<GaussianMixture*> statePool[2], vector<Gaussi
   while (!state_recycler.empty()) {
     /* Note that set<int> is sorted. Hence when deleting the last  *
      * index, then other to-be-deleted index is not changed.       */
-    idx = *state_recycler.rbegin(); 
+    idx = *state_recycler.rbegin();
     cout << "Remove state index " << idx << endl;
     set<int>::iterator it = state_recycler.end(); it--;
     state_recycler.erase(it);

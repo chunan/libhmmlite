@@ -50,6 +50,10 @@ class Labfile /*{{{*/
     void LoadFile(string filename);
     void SaveLab(string filename) {/*{{{*/
       ofstream fs(filename.c_str());
+      if (fs.fail()) {
+        ErrorExit(__FILE__, __LINE__, -1, "unable to open file %s\n",
+                  filename.c_str());
+      }
       SaveLab(fs);
     }/*}}}*/
     void SaveLab(ofstream &fs);
@@ -335,6 +339,9 @@ class HMM_GMM /*{{{*/
     double CalLogDelta(vector<int> &state_seq, const vector<int> *p_endf = NULL); // Use pi, bjOt, v_trans
     void CalLogPrO(int nframe, vector<int> *p_label = NULL);
 
+    /************** Some special functions **********/
+    void CalLogCondToPostBjOt();
+    void CalLogCondToLogPostBjOt();
     /************** I/O **************/
     void SaveHMM(FILE *fp, const DataType type);
     void LoadHMM(FILE *fp);
