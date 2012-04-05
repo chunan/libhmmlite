@@ -4,13 +4,17 @@
 #include <cstdlib>
 #include <fstream>
 #include <vector>
+#include <deque>
 #include <cassert>
 #include <string>
+#include <limits>
 #include <set>
 #include <pthread.h>
 #include <cmath>
 #include "ugoc_utility.h"
 #include "libatlas_wrapper.h"
+
+#define float_inf std::numeric_limits<float>::infinity()
 
 
 const double LOG2PI  = 1.83787707;
@@ -38,14 +42,13 @@ double EXP( double a);
 
 inline bool isEqual( double a, double b ){ return fabs(a - b) <= ( (a < b) ? fabs(a) : fabs(b) ) * std::numeric_limits<double>::epsilon(); }
 
-class Labfile /*{{{*/
-{
+class Labfile { /*{{{*/
   public:
     Labfile(){ Init(); }
-    Labfile(string filename){LoadFile(filename);}
+    Labfile(string filename){ LoadFile(filename); }
     void Init();
     void condense();
-    void push_back(const int s, const int e, const int c);
+    void push_back(int s, int e, int c, float f = float_inf);
     void CopyLab( const Labfile &ref, const int start, const int end);
     void LoadFile(string filename);
     void SaveLab(string filename) {/*{{{*/
@@ -56,11 +59,14 @@ class Labfile /*{{{*/
       }
       SaveLab(fs);
     }/*}}}*/
-    void SaveLab(ofstream &fs);
+    void SaveLab(ostream &fs) const;
     void DumpData(){/*{{{*/
       cout << "====== Labfile ======\n";
-      for(int i = 0; i < num_lab; i++)
-        cout << "S" << i << "\ts" << start_f[i] << "\te" << end_f[i] << '\t' << cluster[i] << endl;
+      for(int i = 0; i < num_lab; i++) {
+        cout << "S" << i << "\ts" << start_f[i] << "\te" << end_f[i] << '\t' << cluster[i];
+        if (!score.empty()) cout << score[i];
+        cout << endl;
+      }
       cout << "num_lab: " << num_lab << endl;
     }/*}}}*/
     void DumpData(vector<int> &seg_head_state, vector<int> &seg_tail_state){/*{{{*/
@@ -89,6 +95,7 @@ class Labfile /*{{{*/
     int getDuration(int t) const { return end_f[t] - start_f[t] + 1; }
     int getDuration_1(int t) const { return end_f[t] - start_f[t]; }
     int getCluster(int t) const { return cluster[t]; }
+    float getScore(int t) const { return score[t]; }
     vector<int> *getpCluster() { return &cluster; }
     vector<int> *getpStartf() { return &start_f; }
     vector<int> *getpEndf() { return &end_f; }
@@ -98,6 +105,7 @@ class Labfile /*{{{*/
     vector<int> start_f;
     vector<int> end_f;
     vector<int> cluster;
+    vector<float> score;
 };/*}}}*/
 
 class Gaussian /*{{{*/
@@ -137,8 +145,10 @@ class Gaussian /*{{{*/
     double getTotalVar() const;
     void ClearGaussian();
     void AddVarFloor();
-    double logProb(const double *data, const int dim, const bool islog = true) const;
-    double Bhat(const double *data1, const double *data2, const int dim) const;
+    template<typename _Tp>
+    double logProb(_Tp *data, const int dim, const bool islog = true) const;
+    template<typename _Tp1, typename _Tp2>
+    double Bhat(_Tp1 *data1, const _Tp2 *data2, const int dim) const;
     void display(FILE *fp) const;
     void SaveGaussian(FILE *fp, const DataType type);
     void LoadGaussian(FILE *fp);
@@ -331,13 +341,16 @@ class HMM_GMM /*{{{*/
       return bjOt[state_index][obs_index];
     }
     /************** Viterbi **************/
-    void CalLogBgOt(double **obs, int nframe, int dim);
+    template<typename _Tp>
+    void CalLogBgOt(_Tp** obs, int nframe, int dim);
     void CalLogBjOtPxs(int nframe);
     void CalLogAlpha(int nframe, vector<int> *p_state_seq = NULL);
     void ViteInit();
     double CalDelta(vector<int> &, bool isEnd);
     double CalLogDelta(vector<int> &state_seq, const vector<int> *p_endf = NULL); // Use pi, bjOt, v_trans
     void CalLogPrO(int nframe, vector<int> *p_label = NULL);
+    template<typename _Tp>
+    void CalLogBjOt(int nframe, TwoDimArray<_Tp> *table);
 
     /************** Some special functions **********/
     void CalLogCondToPostBjOt();
@@ -415,6 +428,73 @@ class HMM_GMM /*{{{*/
     static int allowedNDel;
 };/*}}}*/
 
+template<typename _Tp>
+void HMM_GMM::CalLogBgOt(_Tp **obs, int nframe, int dim)/*{{{*/
+{
+  vector<Gaussian *> &vGauss = *(getpGM(0,USE)->getpGaussPool());
+
+  bgOt.resize(vGauss.size());
+  for (unsigned g = 0; g < vGauss.size(); g++) {
+    if (!gauss_isUsed[g]) {
+      bgOt[g].clear();
+      continue;
+    }
+    bgOt[g].resize(nframe);
+    for (int t = 0; t < nframe; t++)
+      bgOt[g][t] = vGauss[g]->logProb(obs[t],dim,true) * pdf_weight;
+    //bgOt[g][t] = vGauss[g]->logProb(obs[t],dim,true);
+  }
+}/*}}}*/
+
+template<typename _Tp>
+double Gaussian::logProb(_Tp* data, const int dim, const bool islog) const/*{{{*/
+{
+  double logpr = logConst - 0.5 * Bhat(data, p_mean->pointer(), dim);
+
+  if (islog) return logpr;
+  else return exp(logpr);
+
+}/*}}}*/
+
+template<typename _Tp1, typename _Tp2>
+double Gaussian::Bhat(_Tp1 *data1, const _Tp2 *data2, const int dim) const/*{{{*/
+{
+  /* Memory arrangement */
+  double *data_hat = new double[dim];
+  /**********************/
+
+  double xAx = 0.0;
+  for (int r = 0; r < dim; r++) data_hat[r] = data1[r] - data2[r];
+  for (int r = 0; r < dim; r++) {
+    xAx += data_hat[r] * data_hat[r] * p_icov->entry(r,r);
+    for (int c = r+1; c < dim; c++) {
+      xAx += 2.0 * data_hat[r] * data_hat[c] * p_icov->entry(r,c);
+    }
+  }
+  delete [] data_hat;
+  return xAx;
+
+}/*}}}*/
+
+template<typename _Tp>
+void HMM_GMM::CalLogBjOt(int nframe, TwoDimArray<_Tp> *ptab) {/*{{{*/
+  TwoDimArray<_Tp>& table = *ptab;
+  table.Resize(i_nstate, nframe);
+  table.Memfill(LZERO);
+  /* For each state */
+  for (int j = 0; j < i_nstate; ++j) {
+    GaussianMixture* state = getpGM(j,USE);
+    int mixsize = state->getNmix();
+    for (int t = 0; t < nframe; ++t) {
+      /* sum_{x = 1}^{mixsize} (weight_x * bgot) */
+      for (int x = 0; x < mixsize; ++x) {
+        _Tp bgot =  LProd(LOG(state->getWeight(x)),
+                          bgOt[state->getGaussIdx(x)][t]);
+        table(j, t) = LAdd(table(j, t), bgot);
+      }
+    }
+  }
+}/*}}}*/
 
 void SaveHMMGMG(string filename, HMM_GMM &model);
 void LoadHMMGMG(string filename, HMM_GMM *model, vector<GaussianMixture*> p_statePool[2], vector<Gaussian*> p_gaussPool[2]);

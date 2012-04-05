@@ -130,32 +130,55 @@ void Labfile::LoadFile(string filename) {/*{{{*/
     fprintf(stderr, "Unable to open file %s with flag %s\n", filename.c_str(), "r");
     exit(-1);
   }
-  while (fs >> s_val) {
-    if (! (fs >> e_val))
-      ErrorExit(__FILE__,__LINE__,1,"label file break at line %d\n",num_lab);
-    if (! (fs >> c_val))
-      ErrorExit(__FILE__,__LINE__,1,"label file break at line %d\n",num_lab);
-    if (e_val >= s_val) {
-      num_lab++;
-      start_f.push_back(s_val);
-      end_f.push_back(e_val);
-      cluster.push_back(c_val);
+  char line_buf[1024];
+  while (1) {
+    fs.getline(line_buf, 1024);
+    if (fs.eof() || fs.fail()) break;
+    char *tok;
+    if((tok = strtok(line_buf, " ")) == NULL) { // start time
+      ErrorExit(__FILE__, __LINE__, 1,
+                "label file break at line %d\n", num_lab);
     }
-    else{
-      cout << "start_f = " << s_val << ", end_f = " << e_val << endl;
+    s_val = atoi(tok);
+    if ((tok = strtok(NULL, " ")) == NULL) { // end time
+      ErrorExit(__FILE__, __LINE__, 1,
+                "label file break at line %d\n", num_lab);
+    }
+    e_val = atoi(tok);
+    assert(e_val >= s_val);
+    if ((tok = strtok(NULL, " ")) == NULL) { // cluster index
+      ErrorExit(__FILE__, __LINE__, 1,
+                "label file break at line %d\n", num_lab);
+    }
+    c_val = atoi(tok);
+
+    // push back
+    num_lab++;
+    start_f.push_back(s_val);
+    end_f.push_back(e_val);
+    cluster.push_back(c_val);
+
+    if((tok = strtok(NULL, " ")) != NULL) { // score
+      score.push_back(atof(tok));
+    }
+    if (!score.empty() || score.size() != start_f.size()) {
+      ErrorExit(__FILE__, __LINE__, 1,
+                "Inconsistent score entries at line %d\n", num_lab);
     }
   }
   fs.close();
 }/*}}}*/
 
-void Labfile::SaveLab(ofstream &fs) {/*{{{*/
+void Labfile::SaveLab(ostream &fs) const {/*{{{*/
   assert(start_f.size() == static_cast<unsigned>(num_lab));
   assert(end_f.size() == static_cast<unsigned>(num_lab));
   assert(cluster.size() == static_cast<unsigned>(num_lab));
 
-  for (int i = 0; i < num_lab; i++)
-    fs << start_f[i] << ' ' << end_f[i] << ' ' << cluster[i] << endl;
-  fs.close();
+  for (int i = 0; i < num_lab; ++i) {
+    fs << start_f[i] << ' ' << end_f[i] << ' ' << cluster[i];
+    if (!score.empty()) fs << ' ' << score[i];
+    fs << endl;
+  }
 }/*}}}*/
 
 void Labfile::Init() {/*{{{*/
@@ -164,33 +187,36 @@ void Labfile::Init() {/*{{{*/
   start_f.clear();
   end_f.clear();
   cluster.clear();
+  score.clear();
 }/*}}}*/
 
-void Labfile::push_back(const int s, const int e, const int c)/*{{{*/
-{
+void Labfile::push_back(int s, int e, int c, float f) {/*{{{*/
   start_f.push_back(s);
   end_f.push_back(e);
   cluster.push_back(c);
+  if (f != float_inf) score.push_back(f);
   num_lab++;
 }/*}}}*/
 
-void Labfile::condense()/*{{{*/
-{
+void Labfile::condense() { /*{{{*/
   vector<int>::iterator s_i = start_f.begin() + 1;
   vector<int>::iterator e_i = end_f.begin() + 1;
   vector<int>::iterator c_i = cluster.begin() + 1;
-  while (c_i != cluster.end())
-  {
+  vector<float>::iterator f_i = score.begin() + 1;
+  while (c_i != cluster.end()) {
     if (*c_i == *(c_i - 1)) {
       *(e_i - 1) = *e_i;
+      *(f_i - 1) += *f_i;
       s_i = start_f.erase(s_i);
       e_i = end_f.erase(e_i);
       c_i = cluster.erase(c_i);
+      f_i = score.erase(f_i);
     }
     else{
       s_i++;
       e_i++;
       c_i++;
+      f_i++;
     }
   }
   num_lab = start_f.size();
@@ -511,34 +537,6 @@ void Gaussian::backoff(const Gaussian &g, double backoff_weight)/*{{{*/
   }
 
   pthread_mutex_unlock(&G_mutex);
-
-}/*}}}*/
-
-double Gaussian::logProb(const double *data, const int dim, const bool islog) const/*{{{*/
-{
-  double logpr = logConst - 0.5 * Bhat(data, p_mean->pointer(), dim);
-
-  if (islog) return logpr;
-  else return exp(logpr);
-
-}/*}}}*/
-
-double Gaussian::Bhat(const double *data1, const double *data2, const int dim) const/*{{{*/
-{
-  /* Memory arrangement */
-  double *data_hat = new double[dim];
-  /**********************/
-
-  double xAx = 0.0;
-  for (int r = 0; r < dim; r++) data_hat[r] = data1[r] - data2[r];
-  for (int r = 0; r < dim; r++) {
-    xAx += data_hat[r] * data_hat[r] * p_icov->entry(r,r);
-    for (int c = r+1; c < dim; c++) {
-      xAx += 2.0 * data_hat[r] * data_hat[c] * p_icov->entry(r,c);
-    }
-  }
-  delete [] data_hat;
-  return xAx;
 
 }/*}}}*/
 
@@ -1372,23 +1370,6 @@ void HMM_GMM::SyncUsed()/*{{{*/
   }
 }/*}}}*/
 
-void HMM_GMM::CalLogBgOt(double **obs, int nframe, int dim)/*{{{*/
-{
-  vector<Gaussian *> &vGauss = *(getpGM(0,USE)->getpGaussPool());
-
-  bgOt.resize(vGauss.size());
-  for (unsigned g = 0; g < vGauss.size(); g++) {
-    if (!gauss_isUsed[g]) {
-      bgOt[g].clear();
-      continue;
-    }
-    bgOt[g].resize(nframe);
-    for (int t = 0; t < nframe; t++)
-      bgOt[g][t] = vGauss[g]->logProb(obs[t],dim,true) * pdf_weight;
-    //bgOt[g][t] = vGauss[g]->logProb(obs[t],dim,true);
-  }
-}/*}}}*/
-
 void HMM_GMM::CalLogBjOtPxs(int nframe)/*{{{*/
 {
   GaussianMixture *state;
@@ -1422,6 +1403,7 @@ void HMM_GMM::CalLogBjOtPxs(int nframe)/*{{{*/
     }
   }
 }/*}}}*/
+
 
 void HMM_GMM::CalLogCondToLogPostBjOt() {
   int nframe = static_cast<int>(bjOt[0].size());
