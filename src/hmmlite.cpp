@@ -146,7 +146,7 @@ void Labfile::LoadFile(string filename) {/*{{{*/
     }
     e_val = atoi(tok);
     assert(e_val >= s_val);
-    if ((tok = strtok(NULL, " ")) == NULL) { // cluster index
+    if ((tok = strtok(NULL, " \n")) == NULL) { // cluster index
       ErrorExit(__FILE__, __LINE__, 1,
                 "label file break at line %d\n", num_lab);
     }
@@ -158,10 +158,10 @@ void Labfile::LoadFile(string filename) {/*{{{*/
     end_f.push_back(e_val);
     cluster.push_back(c_val);
 
-    if((tok = strtok(NULL, " ")) != NULL) { // score
+    if((tok = strtok(NULL, " \n")) != NULL) { // score
       score.push_back(atof(tok));
     }
-    if (!score.empty() || score.size() != start_f.size()) {
+    if (!score.empty() && score.size() != start_f.size()) {
       ErrorExit(__FILE__, __LINE__, 1,
                 "Inconsistent score entries at line %d\n", num_lab);
     }
