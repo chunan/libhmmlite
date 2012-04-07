@@ -60,6 +60,7 @@ class Labfile { /*{{{*/
       SaveLab(fs);
     }/*}}}*/
     void SaveLab(ostream &fs) const;
+    void Reverse();
     void DumpData(){/*{{{*/
       cout << "====== Labfile ======\n";
       for(int i = 0; i < num_lab; i++) {

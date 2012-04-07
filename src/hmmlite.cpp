@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstring>
 #include <set>
+#include <algorithm>
 
 using namespace std;
 using namespace atlas;
@@ -178,6 +179,15 @@ void Labfile::SaveLab(ostream &fs) const {/*{{{*/
     fs << start_f[i] << ' ' << end_f[i] << ' ' << cluster[i];
     if (!score.empty()) fs << ' ' << score[i];
     fs << endl;
+  }
+}/*}}}*/
+
+void Labfile::Reverse() {/*{{{*/
+  if (num_lab > 0) {
+    std::reverse(start_f.begin(), start_f.end());
+    std::reverse(end_f.begin(), end_f.end());
+    std::reverse(cluster.begin(), cluster.end());
+    std::reverse(score.begin(), score.end());
   }
 }/*}}}*/
 
