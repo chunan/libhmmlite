@@ -80,7 +80,8 @@ class Labfile { /*{{{*/
       }
       cout << "num_lab: " << num_lab << endl;
     }/*}}}*/
-    void parseStateSeq( vector<int> &state_seq );
+    void parseStateSeq(vector<int> &state_seq,
+                       vector<float>* likelihood_seq = NULL);
     void parseStateSeq( vector<int> &state_seq, vector<int> &ref_end_f );
     void expandMaxClust(unsigned *p_max_clust){/*{{{*/
       for(unsigned i = 0; i < cluster.size(); i++)
@@ -348,7 +349,9 @@ class HMM_GMM /*{{{*/
     void CalLogAlpha(int nframe, vector<int> *p_state_seq = NULL);
     void ViteInit();
     double CalDelta(vector<int> &, bool isEnd);
-    double CalLogDelta(vector<int> &state_seq, const vector<int> *p_endf = NULL); // Use pi, bjOt, v_trans
+    double CalLogDelta(vector<int>& state_seq,
+                       vector<float>* likelihood_seq = NULL,
+                       const vector<int> *p_endf = NULL); // Use pi, bjOt, v_trans
     void CalLogPrO(int nframe, vector<int> *p_label = NULL);
     template<typename _Tp>
     void CalLogBjOt(int nframe, TwoDimArray<_Tp> *table);

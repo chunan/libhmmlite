@@ -232,19 +232,29 @@ void Labfile::condense() { /*{{{*/
   num_lab = start_f.size();
 }/*}}}*/
 
-void Labfile::parseStateSeq(vector<int> &state_seq) {/*{{{*/
+void Labfile::parseStateSeq(vector<int>& state_seq,
+                            vector<float>* likelihood_seq) {/*{{{*/
   assert(&state_seq != &cluster);
   Init();
-  start_f.push_back(0);
-  for (unsigned t = 1; t < state_seq.size(); t++)
-    if (state_seq[t] != state_seq[t-1]) {
-      end_f.push_back(t-1);
-      cluster.push_back(state_seq[t-1]);
-      start_f.push_back(t);
-    }
-  end_f.push_back(state_seq.size()-1);
-  cluster.push_back(state_seq.back());
-  num_lab = cluster.size();
+  if (!state_seq.empty()) {
+    float accumLike = 0.0;
+    start_f.push_back(0);
+    for (unsigned t = 1; t < state_seq.size(); t++)
+      if (state_seq[t] != state_seq[t-1]) {
+        /* finish this entry */
+        end_f.push_back(t-1);
+        cluster.push_back(state_seq[t-1]);
+        if (likelihood_seq) {
+          score.push_back((*likelihood_seq)[t - 1] - accumLike);
+          accumLike = (*likelihood_seq)[t - 1];
+        }
+        /* prepare next entry */
+        start_f.push_back(t);
+      }
+    end_f.push_back(state_seq.size()-1);
+    cluster.push_back(state_seq.back());
+    num_lab = cluster.size();
+  }
 } /*}}}*/
 
 void Labfile::parseStateSeq(vector<int> &state_seq, vector<int> &ref_end_f) {/*{{{*/
@@ -2204,7 +2214,9 @@ double HMM_GMM::CalDelta(vector<int> &state_seq, bool isEnd)/*{{{*/
   return BestScore;
 }/*}}}*/
 
-double HMM_GMM::CalLogDelta(vector<int> &state_seq, const vector<int> *p_endf) {/*{{{*/
+double HMM_GMM::CalLogDelta(vector<int> &state_seq, /*{{{*/
+                            vector<float>* likelihood_seq,
+                            const vector<int> *p_endf) {
   bool bndConstraint = (p_endf != NULL);
   vector<vector<int> > path;
   int nframe = bjOt[0].size();
@@ -2257,6 +2269,7 @@ double HMM_GMM::CalLogDelta(vector<int> &state_seq, const vector<int> *p_endf) {
   }
   /* backtrack */
   state_seq.resize(nframe);
+  if (likelihood_seq) likelihood_seq->resize(nframe);
   //state_seq[nframe_1] = i_nstate-1;
   double BestScore = LZERO;
   for (int i = i_nstate - 1; i >= 0; i--) {
@@ -2266,8 +2279,10 @@ double HMM_GMM::CalLogDelta(vector<int> &state_seq, const vector<int> *p_endf) {
       //cout << "BestScore @ " << state_seq[nframe_1] << endl;
     }
   }
+  (*likelihood_seq)[nframe_1] = delta[state_seq[nframe_1]][nframe_1];
   for (int t = nframe - 2; t >= 0; t--) {
     state_seq[t] = path[state_seq[t+1]][t+1];
+    if (likelihood_seq) (*likelihood_seq)[t] = delta[state_seq[t]][t];
   }
   return BestScore;
 }/*}}}*/
