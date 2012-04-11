@@ -232,10 +232,11 @@ void Labfile::condense() { /*{{{*/
   num_lab = start_f.size();
 }/*}}}*/
 
-void Labfile::parseStateSeq(vector<int>& state_seq,
-                            vector<float>* likelihood_seq) {/*{{{*/
+void Labfile::parseStateSeq(vector<int>& state_seq,/*{{{*/
+                            vector<float>* likelihood_seq) {
   assert(&state_seq != &cluster);
   Init();
+
   if (!state_seq.empty()) {
     float accumLike = 0.0;
     start_f.push_back(0);
@@ -251,10 +252,13 @@ void Labfile::parseStateSeq(vector<int>& state_seq,
         /* prepare next entry */
         start_f.push_back(t);
       }
+    /* Final entry */
     end_f.push_back(state_seq.size()-1);
     cluster.push_back(state_seq.back());
+    score.push_back(likelihood_seq->back() - accumLike);
     num_lab = cluster.size();
   }
+
 } /*}}}*/
 
 void Labfile::parseStateSeq(vector<int> &state_seq, vector<int> &ref_end_f) {/*{{{*/
@@ -2279,7 +2283,7 @@ double HMM_GMM::CalLogDelta(vector<int> &state_seq, /*{{{*/
       //cout << "BestScore @ " << state_seq[nframe_1] << endl;
     }
   }
-  (*likelihood_seq)[nframe_1] = delta[state_seq[nframe_1]][nframe_1];
+  (*likelihood_seq)[nframe_1] = BestScore;
   for (int t = nframe - 2; t >= 0; t--) {
     state_seq[t] = path[state_seq[t+1]][t+1];
     if (likelihood_seq) (*likelihood_seq)[t] = delta[state_seq[t]][t];
