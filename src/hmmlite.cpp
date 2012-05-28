@@ -345,36 +345,6 @@ double Gaussian::InvertCov()/*{{{*/
   return logdet;
 }/*}}}*/
 
-  void Gaussian::AddData/*{{{*/
-(const double *data, const int dim, const double prob, UpdateType udtype)
-{
-  if (!(prob >= 0)) {
-    ErrorExit(__FILE__,__LINE__,-1,"Illigal prob (%f) in Gaussian::AddData()\n",prob);
-  }
-
-  if (prob < ZERO) return;
-
-  pthread_mutex_lock(&G_mutex);
-
-  numframe++;
-  weight += prob;
-  for (int r = 0; r < dim; r++) {
-    double val = prob * data[r];
-    if (udtype == UpdateAll || udtype == UpdateMean)
-      p_mean->setEntryPlus(r,0,val);
-    if (udtype == UpdateAll || udtype == UpdateCov) {
-      p_cov->setEntryPlus(r,r, val * data[r]);
-      if (!isDiag) {
-        for (int c = r+1; c < dim; c++)
-          p_cov->setEntryPlus(r,c, val * data[c]);
-      }
-    }
-  }
-
-  pthread_mutex_unlock(&G_mutex);
-
-}/*}}}*/
-
 void Gaussian::AddMeanCov(const Gaussian &g)/*{{{*/
 {
 
@@ -1239,7 +1209,7 @@ void HMM_GMM::ExpEpsilon()/*{{{*/
 }/*}}}*/
 
 #ifdef NODEF
-void HMM_GMM::CalBgOt(double **obs, int nframe, int dim)/*{{{*/
+void HMM_GMM::CalBgOt(float **obs, int nframe, int dim)/*{{{*/
 {
   vector<Gaussian *> &vGauss = *(getpGM(0,USE)->getpGaussPool());
   bgOt.resize(vGauss.size());
@@ -1792,7 +1762,7 @@ void HMM_GMM::AccumIJ(int nframe, vector<int> *p_label, double obs_weight)/*{{{*
   pthread_mutex_unlock(&H_mutex);
 }/*}}}*/
 
-void HMM_GMM::AccumWeightGaussian(double **obs, int nframe, int dim, UpdateType udtype, vector<int> *p_label, double obs_weight)/*{{{*/
+void HMM_GMM::AccumWeightGaussian(float **obs, int nframe, int dim, UpdateType udtype, vector<int> *p_label, double obs_weight)/*{{{*/
 {
   bool useLabel = (p_label != NULL);
 
@@ -2069,7 +2039,7 @@ void HMM_GMM::EMUpdate(set<int> *p_delete_list, double backoff_weight, UpdateTyp
 
 }/*}}}*/
 
-double HMM_GMM::EMObs(double **obs, int nframe, int dim, double obs_weight, UpdateType udtype) /*{{{*/
+double HMM_GMM::EMObs(float **obs, int nframe, int dim, double obs_weight, UpdateType udtype) /*{{{*/
 {
   CalLogBgOt(obs,nframe,dim); // Use gauss_isUsed; +bgOt
   CalLogBjOtPxs(nframe);      // Use bgOt; +bjOt, +px_s
@@ -2088,7 +2058,7 @@ double HMM_GMM::EMObs(double **obs, int nframe, int dim, double obs_weight, Upda
   return obs_weight * prO;
 }/*}}}*/
 
-double HMM_GMM::EMObsLabel(double **obs, int nframe, int dim, vector<int> *p_label, double obs_weight, UpdateType udtype) /*{{{*/
+double HMM_GMM::EMObsLabel(float **obs, int nframe, int dim, vector<int> *p_label, double obs_weight, UpdateType udtype) /*{{{*/
 {
   Labfile labfile;
   bool newLabel = (p_label == NULL);
@@ -2138,7 +2108,7 @@ double HMM_GMM::EMObsLabel(double **obs, int nframe, int dim, vector<int> *p_lab
   return obs_weight * prO;
 }/*}}}*/
 
-double HMM_GMM::EMObsBound(double **obs, int nframe, int dim, Labfile *p_reflabfile, double obs_weight, UpdateType udtype) /*{{{*/
+double HMM_GMM::EMObsBound(float **obs, int nframe, int dim, Labfile *p_reflabfile, double obs_weight, UpdateType udtype) /*{{{*/
 {
 
   CalLogBgOt(obs,nframe,dim);    // Use gauss_isUsed; +bgOt
@@ -2283,7 +2253,7 @@ double HMM_GMM::CalLogDelta(vector<int> &state_seq, /*{{{*/
       //cout << "BestScore @ " << state_seq[nframe_1] << endl;
     }
   }
-  (*likelihood_seq)[nframe_1] = BestScore;
+  if (likelihood_seq) (*likelihood_seq)[nframe_1] = BestScore;
   for (int t = nframe - 2; t >= 0; t--) {
     state_seq[t] = path[state_seq[t+1]][t+1];
     if (likelihood_seq) (*likelihood_seq)[t] = delta[state_seq[t]][t];
@@ -2560,6 +2530,7 @@ void SaveHMMGMG(string filename, HMM_GMM &model)/*{{{*/
   fclose(fp);
 }/*}}}*/
 
+/* statePool[2], gaussPool[2] */
 void LoadHMMGMG(/*{{{*/
     string filename,
     HMM_GMM *p_model,

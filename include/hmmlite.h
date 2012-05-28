@@ -40,12 +40,16 @@ double LDiv( double loga, double logb);
 double LOG( double a);
 double EXP( double a);
 
-inline bool isEqual( double a, double b ){ return fabs(a - b) <= ( (a < b) ? fabs(a) : fabs(b) ) * std::numeric_limits<double>::epsilon(); }
+inline bool isEqual( double a, double b ) {
+  bool isequal = fabs(a - b) <=
+    Min(fabs(a), fabs(b)) * std::numeric_limits<double>::epsilon();
+  return isequal;
+}
 
 class Labfile { /*{{{*/
   public:
-    Labfile(){ Init(); }
-    Labfile(string filename){ LoadFile(filename); }
+    Labfile() { Init(); }
+    Labfile(string filename) { LoadFile(filename); }
     void Init();
     void condense();
     void push_back(int s, int e, int c, float f = float_inf);
@@ -61,7 +65,7 @@ class Labfile { /*{{{*/
     }/*}}}*/
     void SaveLab(ostream &fs) const;
     void Reverse();
-    void DumpData(){/*{{{*/
+    void DumpData() {/*{{{*/
       cout << "====== Labfile ======\n";
       for(int i = 0; i < num_lab; i++) {
         cout << "S" << i << "\ts" << start_f[i] << "\te" << end_f[i] << '\t' << cluster[i];
@@ -70,11 +74,11 @@ class Labfile { /*{{{*/
       }
       cout << "num_lab: " << num_lab << endl;
     }/*}}}*/
-    void DumpData(vector<int> &seg_head_state, vector<int> &seg_tail_state){/*{{{*/
+    void DumpData(vector<int> &seg_head_state, vector<int> &seg_tail_state) {/*{{{*/
       assert(seg_head_state.size() == seg_tail_state.size());
       cout << "====== Labfile ======\n";
-      for(unsigned s = 0; s < seg_head_state.size(); s++){
-        for(int i = seg_head_state[s]; i <= seg_tail_state[s]; i++){
+      for(unsigned s = 0; s < seg_head_state.size(); s++) {
+        for(int i = seg_head_state[s]; i <= seg_tail_state[s]; i++) {
           cout << "S" << i << "\ts" << start_f[i] << "\te" << end_f[i] << '\t' << cluster[i] << "\tSeg" << s << endl;
         }
       }
@@ -83,7 +87,7 @@ class Labfile { /*{{{*/
     void parseStateSeq(vector<int> &state_seq,
                        vector<float>* likelihood_seq = NULL);
     void parseStateSeq( vector<int> &state_seq, vector<int> &ref_end_f );
-    void expandMaxClust(unsigned *p_max_clust){/*{{{*/
+    void expandMaxClust(unsigned *p_max_clust) {/*{{{*/
       for(unsigned i = 0; i < cluster.size(); i++)
         if(static_cast<unsigned>(cluster[i]) >= *p_max_clust)
           *p_max_clust = cluster[i]+1;
@@ -96,7 +100,10 @@ class Labfile { /*{{{*/
     int getEndF(int t) const { return end_f[t]; };
     int getDuration(int t) const { return end_f[t] - start_f[t] + 1; }
     int getDuration_1(int t) const { return end_f[t] - start_f[t]; }
-    int getCluster(int t) const { return cluster[t]; }
+    int getDuration(int s, int e) const { return end_f[e] - start_f[s] + 1; }
+    int getCluster(int t) const {
+      return t >= 0 ? cluster[t] : cluster[cluster.size() + t];
+    }
     float getScore(int t) const { return score[t]; }
     vector<int> *getpCluster() { return &cluster; }
     vector<int> *getpStartf() { return &start_f; }
@@ -113,16 +120,20 @@ class Labfile { /*{{{*/
 class Gaussian /*{{{*/
 {
   public:
-    Gaussian(){ Init(); }
+    Gaussian() { Init(); }
     Gaussian(const Gaussian &g);
-    Gaussian(int d){ Init(); AllocateMem(d); }
-    ~Gaussian(){ DeallocateMem(); }
+    Gaussian(int d) { Init(); AllocateMem(d); }
+    ~Gaussian() { DeallocateMem(); }
     void AllocateMem(int d = 0);
     double InvertCov();
-    double getLogConst(){ return logConst; }
-    void ZeroCov(){p_cov->zeroFill();}
-    void ZeroMean(){p_mean->zeroFill();}
-    void AddData(const double *data, const int dim, const double prob, UpdateType udtype = UpdateAll);
+    double getLogConst() { return logConst; }
+    void ZeroCov() {p_cov->zeroFill();}
+    void ZeroMean() {p_mean->zeroFill();}
+    template<typename _Tp>
+    void AddData(_Tp *data,
+                 const int dim,
+                 const double prob,
+                 UpdateType udtype = UpdateAll);
     void AddMeanCov(const Gaussian &g);
     const Gaussian & operator=(const Gaussian &g);
     double Bhat_dist(const Gaussian &g1, const Gaussian &g2);
@@ -130,14 +141,19 @@ class Gaussian /*{{{*/
     void CopyMean(const Gaussian &g);
     void backoff(const Gaussian &g, const double backoff_weight);
     bool normMeanCov(const bool subtractmean, UpdateType udtype, double N = -1);
-    void setMean(const int idx, const double val){ p_mean->setEntry(idx,0,val); }
-    void setCov(const int r, const int c, const double val){ assert(r <= c); p_cov->setEntry(r,c,val); }
-    void setDiag(const bool d){ isDiag = d; }
+    void setMean(const int idx, const double val) {
+      p_mean->setEntry(idx,0,val);
+    }
+    void setCov(const int r, const int c, const double val) {
+      assert(r <= c);
+      p_cov->setEntry(r,c,val);
+    }
+    void setDiag(const bool d) { isDiag = d; }
     /* Set REQUIRED_FRAME for normMeanCov() */
-    static void setRequiredFrame(double r){ REQUIRED_FRAME = r; }
-    static void setVarFloor(double v){ VAR_FLOOR = v; }
-    static double getRequiredFrame(){ return REQUIRED_FRAME; }
-    static double getVarFloor(){ return VAR_FLOOR; }
+    static void setRequiredFrame(double r) { REQUIRED_FRAME = r; }
+    static void setVarFloor(double v) { VAR_FLOOR = v; }
+    static double getRequiredFrame() { return REQUIRED_FRAME; }
+    static double getVarFloor() { return VAR_FLOOR; }
 
     int getDim() const { return dim; }
     double getMean(const int idx) const { return p_mean->entry(idx,0); }
@@ -157,7 +173,7 @@ class Gaussian /*{{{*/
 
   private:
     void Init();
-    void DeallocateMem(){
+    void DeallocateMem() {
       if(p_mean) delete p_mean;
       if(p_cov)  delete p_cov;
       if(p_icov) delete p_icov;
@@ -185,9 +201,9 @@ class Gaussian /*{{{*/
 class GaussianMixture /*{{{*/
 {
   public:
-    GaussianMixture(){Init(0,0,0);}
+    GaussianMixture() {Init(0,0,0);}
     GaussianMixture(int d, int m, vector<Gaussian *> *p) {Init(d,m,p);}
-    ~GaussianMixture(){}
+    ~GaussianMixture() {}
     void Init(int d, int x, vector<Gaussian *> *p);
     const GaussianMixture & operator=(const GaussianMixture & gm);
     // Get value
@@ -199,20 +215,20 @@ class GaussianMixture /*{{{*/
     int getNmix() const { return v_gaussidx.size(); }
     string getName() const { return s_name;}
     bool containGidx(int gidx);
-    static double getRequiredFrame(){ return REQUIRED_FRAME; }
+    static double getRequiredFrame() { return REQUIRED_FRAME; }
     // Set value
-    void setDim(int d){ dim = d; }
+    void setDim(int d) { dim = d; }
     void setNmix(int x) { v_weight.resize(x); v_gaussidx.resize(x); }
     void setGaussIdx(unsigned x, unsigned idx);
     void copyGaussIdx(const GaussianMixture *pstate);
-    void setpGaussPool(vector<Gaussian *> *ptr){ pGaussPool = ptr;}
+    void setpGaussPool(vector<Gaussian *> *ptr) { pGaussPool = ptr;}
     void setWeight(int x, double val, SetType s); 
     void copyWeight(GaussianMixture &s); 
     void UniformWeight();
     bool cancelGaussIdx(int idx);
-    void setName(const char *str){ s_name = str; }
-    void setName(const string str){ s_name = str; }
-    static void setRequiredFrame(double r){ REQUIRED_FRAME = r; }
+    void setName(const char *str) { s_name = str; }
+    void setName(const string str) { s_name = str; }
+    static void setRequiredFrame(double r) { REQUIRED_FRAME = r; }
     // Clear value
     void ClearWeight();
     // Normalization
@@ -237,8 +253,8 @@ class GaussianMixture /*{{{*/
 class HMM_GMM /*{{{*/
 {
   public:
-    HMM_GMM(){Init();}
-    ~HMM_GMM(){};
+    HMM_GMM() {Init();}
+    ~HMM_GMM() {};
     /************ Get value **************/
     /* Return number of state */
     int getNstate() const { return i_nstate;}
@@ -280,7 +296,7 @@ class HMM_GMM /*{{{*/
     /* Set number of state */
     void setNstate(int n);
     /* Set use */
-    void setUse(int u){ assert(u==0 || u==1); use = u;}
+    void setUse(int u) { assert(u==0 || u==1); use = u;}
     /* Set s-th state index */
     void setState(unsigned s, unsigned idx);
     /* Set s-th pi value (unused) */
@@ -326,9 +342,9 @@ class HMM_GMM /*{{{*/
     void SyncUsed();
     void EMInitIter();
     /* FIXME: elaborate on the difference of following 3 */
-    double EMObs(double **obs, int nframe, int dim, double weight = 1.0, UpdateType udtype = UpdateAll );
-    double EMObsLabel(double **obs, int nframe, int dim, vector<int> *p_state_seq = NULL, double weight = 1.0, UpdateType udtype = UpdateAll );
-    double EMObsBound(double **obs, int nframe, int dim, Labfile *p_reflabfile, double weight = 1.0, UpdateType udtype = UpdateAll );
+    double EMObs(float **obs, int nframe, int dim, double weight = 1.0, UpdateType udtype = UpdateAll );
+    double EMObsLabel(float **obs, int nframe, int dim, vector<int> *p_state_seq = NULL, double weight = 1.0, UpdateType udtype = UpdateAll );
+    double EMObsBound(float **obs, int nframe, int dim, Labfile *p_reflabfile, double weight = 1.0, UpdateType udtype = UpdateAll );
     void AccumFromThread(const HMM_GMM &model);
     void EMUpdate(set<int> *p_delete_list = NULL, double backoff_weight = 0.0, UpdateType udtype = UpdateAll);
     double normPi(UseType u = USE);
@@ -345,6 +361,10 @@ class HMM_GMM /*{{{*/
     /************** Viterbi **************/
     template<typename _Tp>
     void CalLogBgOt(_Tp** obs, int nframe, int dim);
+
+    template<typename _Tp>
+    void CalLogBgOt(const TwoDimVector<_Tp>& obs, int nframe, int dim);
+
     void CalLogBjOtPxs(int nframe);
     void CalLogAlpha(int nframe, vector<int> *p_state_seq = NULL);
     void ViteInit();
@@ -368,7 +388,7 @@ class HMM_GMM /*{{{*/
     void ReadAscii(FILE *fp);
     void ReadBinary(FILE *fp);
 #ifdef NODEF
-    void CalBgOt(double **obs, int nframe, int dim);
+    void CalBgOt(float **obs, int nframe, int dim);
     void CalBjOtPxs();
     void CalAlpha();
     void CalBeta();
@@ -393,7 +413,7 @@ class HMM_GMM /*{{{*/
 
     void AccumPi( vector<int> *p_state_seq = NULL, double obs_weight = 1.0);
     void AccumIJ( int nframe, vector<int> *p_state_seq = NULL, double obs_weight = 1.0);
-    void AccumWeightGaussian(double **obs, int nframe, int dim, UpdateType udtype, vector<int> *p_state_seq = NULL, double obs_weight = 1.0);
+    void AccumWeightGaussian(float **obs, int nframe, int dim, UpdateType udtype, vector<int> *p_state_seq = NULL, double obs_weight = 1.0);
     void accum2Trans();
 
     // EM memory
@@ -433,8 +453,7 @@ class HMM_GMM /*{{{*/
 };/*}}}*/
 
 template<typename _Tp>
-void HMM_GMM::CalLogBgOt(_Tp **obs, int nframe, int dim)/*{{{*/
-{
+void HMM_GMM::CalLogBgOt(_Tp **obs, int nframe, int dim) {/*{{{*/
   vector<Gaussian *> &vGauss = *(getpGM(0,USE)->getpGaussPool());
 
   bgOt.resize(vGauss.size());
@@ -449,6 +468,26 @@ void HMM_GMM::CalLogBgOt(_Tp **obs, int nframe, int dim)/*{{{*/
     //bgOt[g][t] = vGauss[g]->logProb(obs[t],dim,true);
   }
 }/*}}}*/
+
+
+template<typename _Tp>
+void HMM_GMM::CalLogBgOt(const TwoDimVector<_Tp>& obs,
+                         int nframe, int dim) { /*{{{*/
+  vector<Gaussian *> &vGauss = *(getpGM(0,USE)->getpGaussPool());
+
+  bgOt.resize(vGauss.size());
+  for (unsigned g = 0; g < vGauss.size(); g++) {
+    if (!gauss_isUsed[g]) {
+      bgOt[g].clear();
+      continue;
+    }
+    bgOt[g].resize(nframe);
+    for (int t = 0; t < nframe; t++)
+      bgOt[g][t] = vGauss[g]->logProb(&obs[t][0],dim,true) * pdf_weight;
+    //bgOt[g][t] = vGauss[g]->logProb(obs[t],dim,true);
+  }
+}/*}}}*/
+
 
 template<typename _Tp>
 double Gaussian::logProb(_Tp* data, const int dim, const bool islog) const/*{{{*/
@@ -477,6 +516,38 @@ double Gaussian::Bhat(_Tp1 *data1, const _Tp2 *data2, const int dim) const/*{{{*
   }
   delete [] data_hat;
   return xAx;
+
+}/*}}}*/
+
+template<typename _Tp>
+void Gaussian::AddData(_Tp *data, /*{{{*/
+                       const int dim,
+                       const double prob,
+                       UpdateType udtype) {
+  if (!(prob >= 0)) {
+    ErrorExit(__FILE__,__LINE__,-1,"Illigal prob (%f) in Gaussian::AddData()\n",prob);
+  }
+
+  if (prob < ZERO) return;
+
+  pthread_mutex_lock(&G_mutex);
+
+  numframe++;
+  weight += prob;
+  for (int r = 0; r < dim; r++) {
+    double val = prob * data[r];
+    if (udtype == UpdateAll || udtype == UpdateMean)
+      p_mean->setEntryPlus(r,0,val);
+    if (udtype == UpdateAll || udtype == UpdateCov) {
+      p_cov->setEntryPlus(r,r, val * data[r]);
+      if (!isDiag) {
+        for (int c = r+1; c < dim; c++)
+          p_cov->setEntryPlus(r,c, val * data[c]);
+      }
+    }
+  }
+
+  pthread_mutex_unlock(&G_mutex);
 
 }/*}}}*/
 
