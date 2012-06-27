@@ -11,6 +11,7 @@
 #include <set>
 #include <pthread.h>
 #include <cmath>
+#include <algorithm>
 #include "ugoc_utility.h"
 #include "libatlas_wrapper.h"
 
@@ -65,16 +66,25 @@ class Labfile { /*{{{*/
     }/*}}}*/
     void SaveLab(ostream &fs) const;
     void Reverse();
-    void DumpData() {/*{{{*/
-      cout << "====== Labfile ======\n";
-      for(int i = 0; i < num_lab; i++) {
-        cout << "S" << i << "\ts" << start_f[i] << "\te" << end_f[i] << '\t' << cluster[i];
+    void DumpData(int start = 0, int last = -1) const {/*{{{*/
+      if (start < 0 || start >= num_lab)
+        start = 0;
+      if (last < 0 || last >= num_lab)
+        last = num_lab - 1;
+
+      cout << "====== Labfile.DumpData() ======\n";
+      for(int i = start; i <= last; i++) {
+        cout << i << ": "
+          << start_f[i] << " "
+          << end_f[i] << ' '
+          << cluster[i] << ' ';
         if (!score.empty()) cout << score[i];
         cout << endl;
       }
-      cout << "num_lab: " << num_lab << endl;
+      cout << "num_lab: " << last - start + 1 << endl;
     }/*}}}*/
-    void DumpData(vector<int> &seg_head_state, vector<int> &seg_tail_state) {/*{{{*/
+    void DumpData(vector<int> &seg_head_state,
+                  vector<int> &seg_tail_state) const {/*{{{*/
       assert(seg_head_state.size() == seg_tail_state.size());
       cout << "====== Labfile ======\n";
       for(unsigned s = 0; s < seg_head_state.size(); s++) {
@@ -117,12 +127,18 @@ class Labfile { /*{{{*/
     vector<float> score;
 };/*}}}*/
 
+enum G_type {DIAG, FULL};
+
 class Gaussian /*{{{*/
 {
   public:
     Gaussian() { Init(); }
     Gaussian(const Gaussian &g);
-    Gaussian(int d) { Init(); AllocateMem(d); }
+    Gaussian(int d, G_type type = FULL) {
+      Init();
+      AllocateMem(d);
+      isDiag = (type == DIAG) ? true : false;
+    }
     ~Gaussian() { DeallocateMem(); }
     void AllocateMem(int d = 0);
     double InvertCov();
@@ -130,10 +146,10 @@ class Gaussian /*{{{*/
     void ZeroCov() {p_cov->zeroFill();}
     void ZeroMean() {p_mean->zeroFill();}
     template<typename _Tp>
-    void AddData(_Tp *data,
-                 const int dim,
-                 const double prob,
-                 UpdateType udtype = UpdateAll);
+      void AddData(_Tp *data,
+                   const int dim,
+                   const double prob,
+                   UpdateType udtype = UpdateAll);
     void AddMeanCov(const Gaussian &g);
     const Gaussian & operator=(const Gaussian &g);
     double Bhat_dist(const Gaussian &g1, const Gaussian &g2);
@@ -164,9 +180,9 @@ class Gaussian /*{{{*/
     void ClearGaussian();
     void AddVarFloor();
     template<typename _Tp>
-    double logProb(_Tp *data, const int dim, const bool islog = true) const;
+      double logProb(const _Tp *data, int dim, bool islog = true) const;
     template<typename _Tp1, typename _Tp2>
-    double Bhat(_Tp1 *data1, const _Tp2 *data2, const int dim) const;
+    double Bhat(const _Tp1 *data1, const _Tp2 *data2, const int dim) const;
     void display(FILE *fp) const;
     void SaveGaussian(FILE *fp, const DataType type);
     void LoadGaussian(FILE *fp);
@@ -210,6 +226,7 @@ class GaussianMixture /*{{{*/
     int getDim() const { return dim; }
     int getGaussIdx(unsigned x) const { assert(x < v_gaussidx.size()); return v_gaussidx[x]; }
     double getWeight(unsigned x) const { assert(x < v_gaussidx.size()); return v_weight[x]; }
+    const vector<double>& getWeight() const { return v_weight; }
     Gaussian *getpGauss(unsigned x) const { assert(x < v_gaussidx.size()); return (*pGaussPool)[getGaussIdx(x)]; }
     vector<Gaussian *> *getpGaussPool() const { return pGaussPool; }
     int getNmix() const { return v_gaussidx.size(); }
@@ -342,6 +359,16 @@ class HMM_GMM /*{{{*/
     void SyncUsed();
     void EMInitIter();
     /* FIXME: elaborate on the difference of following 3 */
+    template<typename _Tp>
+      double EMObs(typename vector<vector<_Tp> >::const_iterator start,
+                   typename vector<vector<_Tp> >::const_iterator end,
+                   int dim, double weight = 1.0, UpdateType udtype = UpdateAll);
+    template<typename _Tp>
+      double EMObsBound(typename vector<vector<_Tp> >::const_iterator start,
+                        typename vector<vector<_Tp> >::const_iterator end,
+                        int dim, Labfile *p_reflabfile, double weight = 1.0,
+                        UpdateType udtype = UpdateAll );
+
     double EMObs(float **obs, int nframe, int dim, double weight = 1.0, UpdateType udtype = UpdateAll );
     double EMObsLabel(float **obs, int nframe, int dim, vector<int> *p_state_seq = NULL, double weight = 1.0, UpdateType udtype = UpdateAll );
     double EMObsBound(float **obs, int nframe, int dim, Labfile *p_reflabfile, double weight = 1.0, UpdateType udtype = UpdateAll );
@@ -350,6 +377,7 @@ class HMM_GMM /*{{{*/
     double normPi(UseType u = USE);
     void normTrans();
     void normTransOther();
+    void normTransOther(int sno);
     void normRTrans();
     double normOccupation();
     void dump_var();
@@ -360,10 +388,12 @@ class HMM_GMM /*{{{*/
     }
     /************** Viterbi **************/
     template<typename _Tp>
-    void CalLogBgOt(_Tp** obs, int nframe, int dim);
+      void CalLogBgOt(_Tp** obs, int nframe, int dim);
 
     template<typename _Tp>
-    void CalLogBgOt(const TwoDimVector<_Tp>& obs, int nframe, int dim);
+      void CalLogBgOt(typename vector<vector<_Tp> >::const_iterator start,
+                      typename vector<vector<_Tp> >::const_iterator end,
+                      int dim);
 
     void CalLogBjOtPxs(int nframe);
     void CalLogAlpha(int nframe, vector<int> *p_state_seq = NULL);
@@ -411,10 +441,22 @@ class HMM_GMM /*{{{*/
     void ExpGamma();
     void ExpEpsilon();
 
-    void AccumPi( vector<int> *p_state_seq = NULL, double obs_weight = 1.0);
-    void AccumIJ( int nframe, vector<int> *p_state_seq = NULL, double obs_weight = 1.0);
-    void AccumWeightGaussian(float **obs, int nframe, int dim, UpdateType udtype, vector<int> *p_state_seq = NULL, double obs_weight = 1.0);
+    void AccumPi(vector<int> *p_state_seq = NULL, double obs_weight = 1.0);
+    void AccumIJ(int nframe, vector<int> *p_state_seq = NULL,
+                 double obs_weight = 1.0);
+    void AccumWeightGaussian(float **obs, int nframe, int dim,
+                             UpdateType udtype, vector<int> *p_label = NULL,
+                             double obs_weight = 1.0);
     void accum2Trans();
+
+    template<typename _Tp>
+      void AccumWeightGaussian(
+          typename vector<vector<_Tp> >::const_iterator start,
+          typename vector<vector<_Tp> >::const_iterator end,
+          int dim,
+          UpdateType udtype,
+          vector<int> *p_label = NULL,
+          double obs_weight = 1.0);
 
     // EM memory
     // Index: t (time), i (state), j (state), x (mixture)
@@ -469,12 +511,13 @@ void HMM_GMM::CalLogBgOt(_Tp **obs, int nframe, int dim) {/*{{{*/
   }
 }/*}}}*/
 
-
 template<typename _Tp>
-void HMM_GMM::CalLogBgOt(const TwoDimVector<_Tp>& obs,
-                         int nframe, int dim) { /*{{{*/
+void HMM_GMM::CalLogBgOt(typename vector<vector<_Tp> >::const_iterator start, /*{{{*/
+                         typename vector<vector<_Tp> >::const_iterator end,
+                         int dim) {
   vector<Gaussian *> &vGauss = *(getpGM(0,USE)->getpGaussPool());
 
+  int nframe = end - start;
   bgOt.resize(vGauss.size());
   for (unsigned g = 0; g < vGauss.size(); g++) {
     if (!gauss_isUsed[g]) {
@@ -482,15 +525,104 @@ void HMM_GMM::CalLogBgOt(const TwoDimVector<_Tp>& obs,
       continue;
     }
     bgOt[g].resize(nframe);
-    for (int t = 0; t < nframe; t++)
-      bgOt[g][t] = vGauss[g]->logProb(&obs[t][0],dim,true) * pdf_weight;
-    //bgOt[g][t] = vGauss[g]->logProb(obs[t],dim,true);
+    for (int t = 0; t < nframe; t++) {
+      typename vector<vector<_Tp> >::const_iterator itr = start + t;
+      const _Tp* obs = &itr->front();
+      bgOt[g][t] = vGauss[g]->logProb(obs, dim, true) * pdf_weight;
+    }
   }
 }/*}}}*/
 
+template<typename _Tp>
+double HMM_GMM::EMObs(typename vector<vector<_Tp> >::const_iterator start,
+                      typename vector<vector<_Tp> >::const_iterator end,
+                      int dim, double weight, UpdateType udtype) {
+  int nframe = end - start;
+  CalLogBgOt<_Tp>(start, end, dim); // Use gauss_isUsed; +bgOt
+  CalLogBjOtPxs(nframe);            // Use bgOt; +bjOt, +px_s
+  CalLogAlpha(nframe);              // Use trans pi bjot; +alpha
+  CalLogBeta(nframe);               // Use trans bjot; +beta
+  CalLogPrO(nframe);                // Use alpha; +prO;
+  CalLogGamma(nframe);              // Use alpha beta prO; +gamma
+  CalLogEpsilon(nframe);            // Use alpha beta trans bjot prO; +epsilon
+  ExpPxs();
+  ExpGamma();
+  ExpEpsilon();
+  AccumPi(NULL, weight);            // Use gamma; +pi
+  AccumIJ(nframe, NULL, weight);    // Use epsilon; +acuum_ij
+  AccumWeightGaussian<_Tp>(start, end, dim, udtype, NULL, weight);
+  // Use gamma px_s; (+e)state->setWeight(), (+e)gauss->AddData()
+
+  return weight * prO;
+}
 
 template<typename _Tp>
-double Gaussian::logProb(_Tp* data, const int dim, const bool islog) const/*{{{*/
+double HMM_GMM::EMObsBound(typename vector<vector<_Tp> >::const_iterator start,
+                           typename vector<vector<_Tp> >::const_iterator end,
+                           int dim, Labfile *p_reflabfile, double weight,
+                           UpdateType udtype) {
+
+  int nframe = end - start;
+  CalLogBgOt<_Tp>(start, end, dim); // Use gauss_isUsed; +bgOt
+  CalLogBjOtPxs(nframe);            // Use bgOt; +bjOt, +px_s
+  CalLogAlphaBound(nframe, p_reflabfile->getpEndf());
+  // Use trans pi bjot; +alpha
+  CalLogBetaBound(nframe, p_reflabfile->getpStartf()); // Use trans bjot; +beta
+  CalLogPrO(nframe);                // Use alpha; +prO;
+  CalLogGamma(nframe);              // Use alpha beta prO; +gamma
+  CalLogEpsilonBound(nframe ,p_reflabfile->getpEndf()); 
+  // Use alpha beta trans bjot prO; +epsilon
+  ExpPxs();
+  ExpGamma();
+  ExpEpsilon();
+  AccumPi(NULL, weight);            // Use gamma; +pi
+  AccumIJ(nframe, NULL, weight);    // Use epsilon; +acuum_ij
+  AccumWeightGaussian<_Tp>(start, end, dim, udtype, NULL, weight);
+  // Use gamma px_s; (+e)state->setWeight(), (+e)gauss->AddData()
+
+  return weight * prO;
+}/*}}}*/
+
+template<typename _Tp>
+void HMM_GMM::AccumWeightGaussian(
+    typename vector<vector<_Tp> >::const_iterator start,
+    typename vector<vector<_Tp> >::const_iterator end,
+    int dim,
+    UpdateType udtype,
+    vector<int> *p_label,
+    double obs_weight) {
+  bool useLabel = (p_label != NULL);
+
+  int nframe = end - start;
+
+  /* For each state */
+  for (unsigned i = 0; i < gamma.size(); i++) {
+
+    int sno_i = useLabel ? (*p_label)[i] : i;
+    GaussianMixture *state = getpGM(sno_i,UNUSE);
+
+    /* For each gaussian associated with this state*/
+    for (int x = 0; x < state->getNmix(); x++) {
+      Gaussian *pg = state->getpGauss(x);
+      for (int t = 0; t < nframe; t++) {
+        typename vector<vector<_Tp> >::const_iterator itr = start + t;
+        const _Tp* obs = &(*itr)[0];
+        double gamma_i_x_t = obs_weight * gamma[i][t] * px_s[sno_i][x][t];
+        if (gamma_i_x_t <= ZERO) continue;
+        pg->AddData(obs, dim, gamma_i_x_t, udtype);
+        // Here we do not divide by sum_gamma[i] because
+        // the total sum of weights in state i is
+        // actually sum_gamma[i]
+        state->setWeight(x, gamma_i_x_t, ADD);
+      }
+    }
+  }
+
+}
+
+
+template<typename _Tp>
+double Gaussian::logProb(const _Tp* data, int dim, bool islog) const/*{{{*/
 {
   double logpr = logConst - 0.5 * Bhat(data, p_mean->pointer(), dim);
 
@@ -500,21 +632,22 @@ double Gaussian::logProb(_Tp* data, const int dim, const bool islog) const/*{{{*
 }/*}}}*/
 
 template<typename _Tp1, typename _Tp2>
-double Gaussian::Bhat(_Tp1 *data1, const _Tp2 *data2, const int dim) const/*{{{*/
+double Gaussian::Bhat(const _Tp1 *data1, const _Tp2 *data2, const int dim) const/*{{{*/
 {
   /* Memory arrangement */
-  double *data_hat = new double[dim];
+  vector<double>data_hat(dim);
   /**********************/
 
   double xAx = 0.0;
   for (int r = 0; r < dim; r++) data_hat[r] = data1[r] - data2[r];
   for (int r = 0; r < dim; r++) {
     xAx += data_hat[r] * data_hat[r] * p_icov->entry(r,r);
-    for (int c = r+1; c < dim; c++) {
-      xAx += 2.0 * data_hat[r] * data_hat[c] * p_icov->entry(r,c);
+    if (!isDiag) {
+      for (int c = r+1; c < dim; c++) {
+        xAx += 2.0 * data_hat[r] * data_hat[c] * p_icov->entry(r,c);
+      }
     }
   }
-  delete [] data_hat;
   return xAx;
 
 }/*}}}*/
@@ -559,12 +692,14 @@ void HMM_GMM::CalLogBjOt(int nframe, TwoDimArray<_Tp> *ptab) {/*{{{*/
   /* For each state */
   for (int j = 0; j < i_nstate; ++j) {
     GaussianMixture* state = getpGM(j,USE);
+    /* Calculate Log weight */
+    vector<double> weight(state->getWeight());
+    for_each(weight.begin(), weight.end(), EXP);
     int mixsize = state->getNmix();
     for (int t = 0; t < nframe; ++t) {
       /* sum_{x = 1}^{mixsize} (weight_x * bgot) */
       for (int x = 0; x < mixsize; ++x) {
-        _Tp bgot =  LProd(LOG(state->getWeight(x)),
-                          bgOt[state->getGaussIdx(x)][t]);
+        _Tp bgot =  LProd(weight[x], bgOt[state->getGaussIdx(x)][t]);
         table(j, t) = LAdd(table(j, t), bgot);
       }
     }
