@@ -12,7 +12,7 @@
 #include <pthread.h>
 #include <cmath>
 #include <algorithm>
-#include "ugoc_utility.h"
+#include "utility.h"
 #include "libatlas_wrapper.h"
 
 #define float_inf std::numeric_limits<float>::infinity()
@@ -43,7 +43,7 @@ double EXP( double a);
 
 inline bool isEqual( double a, double b ) {
   bool isequal = fabs(a - b) <=
-    Min(fabs(a), fabs(b)) * std::numeric_limits<double>::epsilon();
+    min<float>(fabs(a), fabs(b)) * std::numeric_limits<double>::epsilon();
   return isequal;
 }
 

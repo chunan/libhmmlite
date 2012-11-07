@@ -1,5 +1,5 @@
 #include "hmmlite.h"
-#include "ugoc_utility.h"
+#include "utility.h"
 #include <cmath>
 #include <iomanip>
 #include <cstdio>
@@ -32,6 +32,12 @@ void printVVec(vector<vector< T> >& vvec, const char *msg) {
     printf("\n");
   }
 }
+
+/**
+ * @mainpage  Libhmmlit -- a lightweight HMM library
+ *
+ * Support training and testing with general HMM topology.
+ */
 
 static void G_strip (register char *buf)/*{{{*/
 {
@@ -398,8 +404,14 @@ void Gaussian::AddVarFloor()/*{{{*/
 
   pthread_mutex_lock(&G_mutex);
 
-  for (int i = 0; i < dim; i++)
-    p_cov->setEntryPlus(i,i,VAR_FLOOR);
+  for (int i = 0; i < dim; i++) {
+#if 0
+    if (p_cov->entry(i, i) < VAR_FLOOR) {
+      p_cov->setEntry(i,i,VAR_FLOOR);
+    }
+#endif
+    p_cov->setEntryPlus(i, i, VAR_FLOOR);
+  }
 
   pthread_mutex_unlock(&G_mutex);
 
@@ -1389,11 +1401,9 @@ void HMM_GMM::SyncUsed()/*{{{*/
   vector<Gaussian *> &vGauss = *getpGaussPool(USE);
   vector<GaussianMixture *> &vState = *getpStatePool(USE);
 
-  state_isUsed.resize(vState.size());
-  gauss_isUsed.resize(vGauss.size());
+  state_isUsed.assign(vState.size(), false);
+  gauss_isUsed.assign(vGauss.size(), false);
 
-  for (unsigned g = 0; g < gauss_isUsed.size(); g++) gauss_isUsed[g] = false;
-  for (unsigned i = 0; i < state_isUsed.size(); i++) state_isUsed[i] = false;
 
   for (int j = 0; j < i_nstate; j++) {
     state_isUsed[getGMidx(j)] = true;
@@ -1845,12 +1855,15 @@ void HMM_GMM::normTrans()/*{{{*/
 {
   for (int i = 0; i < i_nstate; i++) {
     double sum = 0.0;
+    /* Calculate nonZERO transition sum */
     for (int j = 0; j < i_nstate; j++) {
       if (v_trans[i][j] < ZERO) v_trans[i][j] = 0.0;
       else sum += v_trans[i][j];
     }
-    double trans_floor = (sum-v_trans[i][i]) * TRANS_ZERO / (i_nstate-1);
+    double trans_floor = (sum - v_trans[i][i]) * TRANS_ZERO / i_nstate;
     sum = 0.0;
+
+    /* Calculate transitions above trans_floor */
     for (int j = 0; j < i_nstate; j++) {
       if (v_trans[i][j] < ZERO) continue;
       if (v_trans[i][j] < trans_floor) {
@@ -1859,8 +1872,13 @@ void HMM_GMM::normTrans()/*{{{*/
       else sum += v_trans[i][j];
     }
     if (sum < ZERO) {
-      cerr << "HMM_GMM::normTrans(): no occupation for state no " << i << ", transition set to zero" << endl;
-      for (int j = 0; j < i_nstate; j++) v_trans[i][j] = 0.0;
+      cerr << "HMM_GMM::normTrans(): no occupation for state no " << i
+        << ", transition set to zero" << endl;
+
+      for (int j = 0; j < i_nstate; j++) {
+        cout << "v_trans[" << i << "][" << j << "] = " << v_trans[i][j] << endl;
+        v_trans[i][j] = 0.0;
+      }
     }
     for (int j = 0; j < i_nstate; j++) {
       if (v_trans[i][j] > ZERO) v_trans[i][j] /= sum;
@@ -1937,14 +1955,18 @@ void HMM_GMM::accum2Trans()/*{{{*/
     for (int j = 0; j < i_nstate; j++) {
       if (accum_ij[i][j] > ZERO) sum += accum_ij[i][j];
     }
-    double trans_floor = (sum - accum_ij[i][i]) * TRANS_ZERO / (i_nstate-1);
+    double trans_floor = (sum - accum_ij[i][i]) * TRANS_ZERO / i_nstate;
     sum = 0.0;
     for (int j = 0; j < i_nstate; j++) {
       if (accum_ij[i][j] >= trans_floor) sum += accum_ij[i][j];
     }
     if (sum < ZERO) {
-      cerr << "no occupation for state no " << i << ", transition set to zero" << endl;
-      for (int j = 0; j < i_nstate; j++) v_trans[i][j] = 0.0;
+      cerr << "no occupation for state no " << i
+        << ", transition set to zero" << endl;
+      for (int j = 0; j < i_nstate; j++) {
+        cout << "v_trans[" << i << "][" << j << "] = " << v_trans[i][j] << endl;
+        v_trans[i][j] = 0.0;
+      }
     }
     else{
       for (int j = 0; j < i_nstate; j++) {

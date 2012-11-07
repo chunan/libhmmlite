@@ -1,6 +1,6 @@
 CC = g++
 CXX = g++
-CXXFLAGS = -Iinclude -I../libatlas_wrapper/include -I../anguso_arg_parser/include -I../ugoc_utility/include
+CXXFLAGS = -Iinclude -I../libatlas_wrapper/include -I../anguso_arg_parser/include -I../libutility/include
 
 MACHINE = $(shell uname -m)
 
