@@ -6,6 +6,8 @@
 #include <cstring>
 #include <set>
 #include <algorithm>
+#include <sstream>
+#include <iterator>
 
 using namespace std;
 using namespace atlas;
@@ -39,39 +41,25 @@ void printVVec(vector<vector< T> >& vvec, const char *msg) {
  * Support training and testing with general HMM topology.
  */
 
-static void G_strip (register char *buf)/*{{{*/
-{
-  register char *a, *b;
-
-  /* remove leading white space */
-  for (a = b = buf; *a == ' ' || *a == '\t'; a++) continue;
-  if (a != b) {
-    while (*a) {
-      *b = *a;
-      b++;
-      a++;
-    }
-  }
-  /*
-     while (*b++ = *a++)
-     ;
-     */
-  /* remove trailing white space */
-  for (/*a = buf*/; *a; a++)
-    ;
-  if (a != buf) {
-    for (a--; *a == ' ' || *a == '\t'; a--)
-      ;
-    a++;
-    *a = 0;
-  }
+void G_strip (char *theString) {/*{{{*/
+  // Point to last character
+  char *p = &theString [strlen (theString) - 1];
+  // Move forward to first non-whitespace
+  while (isspace (*p)) --p;
+  // Move back one to beginning of whitespace
+  // and terminate the string at that point
+  *(++p) = '\0';
+  // Point to front
+  p = theString;
+  // Find first non-whitespace
+  while (isspace (*p)) ++p;
+  // Copy from here (first non-whitespace) to beginning
+  strcpy (theString, p);
 }/*}}}*/
 
-static int gettag(FILE *fd, char *tag)/*{{{*/
-{
+static int gettag(FILE *fd, char *tag) {/*{{{*/
   if (fscanf(fd, "%s", tag) != 1) return 0;
-  G_strip (tag);
-  //cout << tag << endl;
+  G_strip(tag);
   return 1;
 }/*}}}*/
 
@@ -112,7 +100,7 @@ double LDiv(double loga, double logb)/*{{{*/
 
 double LProd(double loga, double logb)/*{{{*/
 {
-  if (loga <= LSMALL || logb <= LSMALL) return LZERO;
+  //if (loga <= LSMALL || logb <= LSMALL) return LZERO;
   double z = loga + logb;
   return (z <= LSMALL) ? LZERO : z;
 }/*}}}*/
@@ -245,28 +233,28 @@ void Labfile::parseStateSeq(vector<int>& state_seq,/*{{{*/
   assert(&state_seq != &cluster);
   Init();
 
-  if (!state_seq.empty()) {
-    float accumLike = 0.0;
-    start_f.push_back(0);
-    for (unsigned t = 1; t < state_seq.size(); t++)
-      if (state_seq[t] != state_seq[t-1]) {
-        /* finish this entry */
-        end_f.push_back(t-1);
-        cluster.push_back(state_seq[t-1]);
-        if (likelihood_seq) {
-          score.push_back((*likelihood_seq)[t - 1] - accumLike);
-          accumLike = (*likelihood_seq)[t - 1];
-        }
-        /* prepare next entry */
-        start_f.push_back(t);
+  if (state_seq.empty()) return;
+
+  float accumLike = 0.0;
+  start_f.push_back(0);
+  for (unsigned t = 1; t < state_seq.size(); t++)
+    if (state_seq[t] != state_seq[t-1]) {
+      /* finish this entry */
+      end_f.push_back(t-1);
+      cluster.push_back(state_seq[t-1]);
+      if (likelihood_seq) {
+        score.push_back((*likelihood_seq)[t - 1] - accumLike);
+        accumLike = (*likelihood_seq)[t - 1];
       }
-    /* Final entry */
-    end_f.push_back(state_seq.size()-1);
-    cluster.push_back(state_seq.back());
-    if (likelihood_seq)
-      score.push_back(likelihood_seq->back() - accumLike);
-    num_lab = cluster.size();
-  }
+      /* prepare next entry */
+      start_f.push_back(t);
+    }
+  /* Final entry */
+  end_f.push_back(state_seq.size()-1);
+  cluster.push_back(state_seq.back());
+  if (likelihood_seq)
+    score.push_back(likelihood_seq->back() - accumLike);
+  num_lab = cluster.size();
 
 } /*}}}*/
 
@@ -727,11 +715,11 @@ bool GaussianMixture::cancelGaussIdx(int idx)/*{{{*/
   return true;
 }/*}}}*/
 
-void GaussianMixture::ClearWeight()/*{{{*/
+void GaussianMixture::ClearWeight(double val)/*{{{*/
 {
   pthread_mutex_lock(&S_mutex);
 
-  for (unsigned x = 0; x < v_weight.size(); x++) v_weight[x] = 0.0;
+  v_weight.assign(v_weight.size(), val);
 
   pthread_mutex_unlock(&S_mutex);
 }/*}}}*/
@@ -807,6 +795,7 @@ void HMM_GMM::CopyForThread(const HMM_GMM &model)/*{{{*/
   v_state = model.v_state;
   left = model.left;
   right = model.right;
+  v_left = model.v_left;
   for (int u = 0; u < 2; u++) {
     pi[u] = model.pi[u];
     pStatePool[u] = model.pStatePool[u];
@@ -932,7 +921,7 @@ GaussianMixture * HMM_GMM::getpGM(int s, UseType u) const /*{{{*/
 {
   assert(s < i_nstate);
   int who = (u == USE) ? use : 1-use;
-  return pStatePool[who]->operator[](v_state[s]);
+  return pStatePool[who]->at(v_state[s]);
 }/*}}}*/
 
 double HMM_GMM::getPi(int s, UseType u) const /*{{{*/
@@ -1155,21 +1144,19 @@ void HMM_GMM::setpGaussPool(vector<Gaussian*> *ptr, UseType u) { /*{{{*/
   else pGaussPool[1-use] = ptr;
 }/*}}}*/
 
-void HMM_GMM::ClearPi(UseType u) {/*{{{*/
+void HMM_GMM::ClearPi(UseType u, double val) {/*{{{*/
   int who = (u == USE) ? use : 1-use;
   pthread_mutex_lock(&H_mutex);
-  for (unsigned i = 0; i < pi[who].size(); i++) pi[who][i] = 0.0;
+  pi[who].assign(pi[who].size(), val);
   pthread_mutex_unlock(&H_mutex);
 }/*}}}*/
 
-void HMM_GMM::ClearTrans() {/*{{{*/
+void HMM_GMM::ClearTrans(double val) {/*{{{*/
   for (unsigned i = 0; i < v_trans.size(); i++) {
-    for (unsigned j = 0; j < v_trans[i].size(); j++)
-      v_trans[i][j] = 0.0;
+    v_trans[i].assign(v_trans[i].size(), val);
   }
   for (unsigned i = 0; i < v_rtrans.size(); i++) {
-    for (unsigned j = 0; j < v_rtrans[i].size(); j++)
-      v_rtrans[i][j] = 0.0;
+    v_rtrans[i].assign(v_rtrans[i].size(), val);
   }
 }/*}}}*/
 
@@ -1190,35 +1177,29 @@ void HMM_GMM::EMInitIter() /*{{{*/
   isLog = true;
 
   /* Pi */
-  ClearPi(UNUSE);
+  ClearPi(UNUSE, 0.0);
 
   /* Trans */
-  ClearIJ();
+  ClearIJ(0.0);
 
   /* state->weight */
   for (unsigned i = 0; i < pStatePool[unuse]->size(); i++)
-    if (state_isUsed[i]) (*pStatePool[unuse])[i]->ClearWeight();
+    if (state_isUsed[i]) (*pStatePool[unuse])[i]->ClearWeight(0.0);
 
   /* Gaussian pool */
   vector<Gaussian *> &vGauss = *getpGaussPool(UNUSE);
-  for (unsigned g = 0; g < vGauss.size(); g++)
-    if (gauss_isUsed[g]) vGauss[g]->ClearGaussian();
-
-  /* Number of utterances*/
-  /*
-     numutt.resize(vGauss.size());
-     for (unsigned g = 0; g < numutt.size(); g++) numutt[g] = 0;
-     */
+  for (unsigned g = 0; g < vGauss.size(); g++) {
+    if (!gauss_isUsed[g]) continue;
+    vGauss[g]->ClearGaussian();
+    vGauss[g]->setDiag(getpGaussPool(USE)->at(g)->getDiag());
+  }
 
 }/*}}}*/
 
-void HMM_GMM::ClearIJ()/*{{{*/
-{
+void HMM_GMM::ClearIJ(double val) {/*{{{*/
   accum_ij.resize(i_nstate);
   for (unsigned i = 0; i < accum_ij.size(); i++) {
-    accum_ij[i].resize(i_nstate);
-    for (unsigned j = 0; j < accum_ij[i].size(); j++)
-      accum_ij[i][j] = 0.0;
+    accum_ij[i].assign(i_nstate, val);
   }
 }/*}}}*/
 
@@ -1260,142 +1241,6 @@ void HMM_GMM::ExpEpsilon()/*{{{*/
         epsilon[i][j][t] = EXP(epsilon[i][j][t]);
 }/*}}}*/
 
-#ifdef NODEF
-void HMM_GMM::CalBgOt(float **obs, int nframe, int dim)/*{{{*/
-{
-  vector<Gaussian *> &vGauss = *(getpGM(0,USE)->getpGaussPool());
-  bgOt.resize(vGauss.size());
-  for (unsigned g = 0; g < vGauss.size(); g++) {
-    bgOt[g].resize(nframe);
-    for (unsigned t = 0; t < nframe; t++)
-      bgOt[g][t] = vGauss[g]->logProb(obs[t],dim,false);
-  }
-}/*}}}*/
-void HMM_GMM::CalBjOtPxs(int nframe)/*{{{*/
-{
-  GaussianMixture *state;
-  int mixsize;
-  bjOt.resize(i_nstate);
-  px_s.resize(i_nstate);
-  /* For each state */
-  for (int j = 0; j < i_nstate; j++) {
-    state  = getpGM(j,USE);
-    mixsize = state->getNmix();
-    bjOt[j].resize(nframe);
-    px_s[j].resize(mixsize);
-    /* For each Gaussian */
-    for (int x = 0; x < mixsize; x++) {
-      px_s[j][x].resize(nframe);
-      for (int t = 0; t < nframe; t++)
-        px_s[j][x][t] = state->getWeight(x) * bgOt[state->getGaussIdx(x)][t];
-      //px_s[j][x][t] = logprod(log(state->getWeight(x)), bgOt[state->getGaussIdx(x)][t]);
-    }
-    /* For each frame */
-    for (int t = 0; t < nframe; t++) {
-      bjOt[j][t] = 0.0;
-      for (int x = 0; x < mixsize; x++)
-        bjOt[j][t] +=  px_s[j][x][t];
-      //bjOt[j][t] = logadd(bjOt[j][t], px_s[j][x][t]);
-      for (int x = 0; x < mixsize; x++)
-        px_s[j][x][t] /= bjOt[j][t];
-      //px_s[j][x][t] = logdiv(px_s[j][x][t], bjOt[j][t]);
-    }
-  }
-}/*}}}*/
-void HMM_GMM::CalAlpha(int nframe)/*{{{*/
-{
-
-  alpha.resize(i_nstate);
-  for (int i = 0; i < i_nstate; i++)
-  {
-    alpha[i].resize(nframe);
-    alpha[i][0] = pi[use][i] * bjOt[i][0];
-  }
-  for (int t = 1; t < nframe; t++) {
-    for (int j = 0; j < i_nstate; j++) {
-      alpha[j][t] = 0.0;
-      for (int i = 0; i < i_nstate; i++) {
-        if (v_trans[i][j] < ZERO) continue;
-        alpha[j][t] += alpha[i][t-1] * v_trans[i][j];
-      }
-      alpha[j][t] *= bjOt[j][t];
-    }
-  }
-}/*}}}*/
-void HMM_GMM::CalBeta(int nframe, vector<int> *p_state_seq)/*{{{*/
-{
-  beta.resize(i_nstate);
-  for (int i = 0; i < i_nstate; i++) {
-    beta[i].resize(nframe);
-    if (getRight(i) == -1) beta[i][nframe-1] = 1.0;
-    else beta[i][nframe-1] = 0.0;
-  }
-  vector<double> nextbeta;
-  nextbeta.resize(i_nstate);
-  for (int t = nframe-2; t >= 0; t--) {
-    for (int j = 0; j < i_nstate; j++)
-      nextbeta[j] = beta[j][t+1] * bjOt[j][t+1];
-    for (int i = 0; i < i_nstate; i++) {
-      beta[i][t] = 0.0;
-      for (int j = 0; j < i_nstate; j++) {
-        if (v_trans[i][j] < ZERO) continue;
-        beta[i][t] += v_trans[i][j] * nextbeta[j];
-      }
-    }
-  }
-}/*}}}*/
-void HMM_GMM::CalPrO(int nframe)/*{{{*/
-{
-  int nframe_1 = nframe - 1;
-  prO = 0.0;
-  for (int i = 0; i < i_nstate; i++)
-    prO += alpha[i][nframe_1];
-
-}/*}}}*/
-void HMM_GMM::CalGamma(int nframe)/*{{{*/
-{
-  gamma.resize(i_nstate);
-  for (int i = 0; i < i_nstate; i++) {
-    gamma[i].resize(nframe);
-    for (int t = 0; t < nframe; t++) {
-      gamma[i][t] = alpha[i][t] * beta[i][t] / prO;
-    }
-  }
-
-}/*}}}*/
-void HMM_GMM::CalSumGamma()/*{{{*/
-{
-  sum_gamma.resize(i_nstate);
-  for (int i = 0; i < i_nstate; i++) {
-    sum_gamma[i] = 0.0;
-    for (unsigned t = 0; t < gamma[i].size(); t++)
-      sum_gamma[i] += gamma[i][t];
-  }
-
-}/*}}}*/
-void HMM_GMM::CalEpsilon(int nframe)/*{{{*/
-{
-  int nframe_1 = nframe-1;
-  epsilon.resize(i_nstate);
-  for (int i = 0; i < i_nstate; i++) {
-    epsilon[i].resize(i_nstate);
-    for (int j = 0; j < i_nstate; j++)
-      epsilon[i][j].resize(nframe_1);
-  }
-
-  for (int t = 0; t < nframe_1; t++) {
-    for (int j = 0; j < i_nstate; j++) {
-      double bjot_beta_prO = bjOt[j][t+1] * beta[j][t+1] / prO;
-      for (int i = 0; i < i_nstate; i++) {
-        if (v_trans[i][j] < ZERO) continue;
-        epsilon[i][j][t] = alpha[i][t] * v_trans[i][j] * bjot_beta_prO;
-      }
-    }
-  }
-
-}/*}}}*/
-#endif
-
 void HMM_GMM::SyncUsed()/*{{{*/
 {
   vector<Gaussian *> &vGauss = *getpGaussPool(USE);
@@ -1414,73 +1259,88 @@ void HMM_GMM::SyncUsed()/*{{{*/
   }
 }/*}}}*/
 
-void HMM_GMM::CalLogBjOtPxs(int nframe)/*{{{*/
-{
-  GaussianMixture *state;
-  int mixsize;
-  bjOt.resize(i_nstate);
-  px_s.resize(i_nstate);
+void HMM_GMM::CalLogBjOtPxs(int nframe) {/*{{{*/
+
+  vector<GaussianMixture*>& gmpool = *pStatePool[use];
+  bjOt.resize(gmpool.size());
+  px_s.resize(gmpool.size());
+
   /* For each state */
-  for (int j = 0; j < i_nstate; j++) {
-    state  = getpGM(j,USE);
-    mixsize = state->getNmix();
+  for (unsigned j = 0; j < gmpool.size(); j++) {
+    if (!state_isUsed[j]) continue;
+    int mixsize = gmpool[j]->getNmix();
     bjOt[j].resize(nframe);
     px_s[j].resize(mixsize);
-    /* Calculate Log weight */
-    vector<double> weight(state->getWeight());
-    for_each(weight.begin(), weight.end(), LOG);
-    /* For each Gaussian */
-    for (int x = 0; x < mixsize; x++) {
-      px_s[j][x].resize(nframe);
-      /* For each frame */
+
+    if (mixsize == 1) { // single-Gaussian
+      px_s[j][0].resize(nframe);
       for (int t = 0; t < nframe; t++) {
-        px_s[j][x][t] = LProd(weight[x], bgOt[state->getGaussIdx(x)][t]);
+        bjOt[j][t] = bgOt[gmpool[j]->getGaussIdx(0)][t];
+        px_s[j][0][t] = 0.0; // = logp(x| ot, j) = log(1)
       }
-    }
-    /* For each frame */
-    for (int t = 0; t < nframe; t++) {
-      bjOt[j][t] = LZERO;
-      for (int x = 0; x < mixsize; x++)
-        bjOt[j][t] = LAdd(bjOt[j][t], px_s[j][x][t]);
+
+    } else { // multi-Gaussians
+      vector<double> weight(gmpool[j]->getWeight());
+      for_each(weight.begin(), weight.end(), LOG);
+      /* For each x: px_s = logp(ot, x| j)*/
       for (int x = 0; x < mixsize; x++) {
-        if (bjOt[j][t] > LSMALL) px_s[j][x][t] = LDiv(px_s[j][x][t], bjOt[j][t]);
-        else px_s[j][x][t] = LZERO;
+        px_s[j][x].resize(nframe);
+        for (int t = 0; t < nframe; t++)
+          px_s[j][x][t] = LProd(weight[x], bgOt[gmpool[j]->getGaussIdx(x)][t]);
       }
+      /* For each frame, bjOt[j][t] = px_s[j][SUM x][t] = log(ot| j) */
+      for (int t = 0; t < nframe; t++) {
+        bjOt[j][t] = px_s[j][0][t];
+        /* sum over x */
+        for (int x = 1; x < mixsize; x++)
+          bjOt[j][t] = LAdd(bjOt[j][t], px_s[j][x][t]);
+        /* normalize px_s[j][x][t] / px_s[][SUM x][t] */
+        for (int x = 0; x < mixsize; x++)
+          px_s[j][x][t] = LDiv(px_s[j][x][t], bjOt[j][t]);
+      }
+      /* For each x: px_s = logp(x|ot, j) */
     }
+
+    /* px_s = log p(o, g | j) */
   }
+  /* Recycle bgOt because it is memory wasted */
+  bgOt.clear();
 }/*}}}*/
 
+void HMM_GMM::CalLogBjOt(int nframe) {/*{{{*/
 
-void HMM_GMM::CalLogCondToLogPostBjOt() {
-  int nframe = static_cast<int>(bjOt[0].size());
-  for (int t = 0; t < nframe; ++t) {
-    double tot_prob = 0.0;
-    for (int j = 0; j < i_nstate; ++j) {
-      tot_prob += EXP(bjOt[j][t]);
+  vector<GaussianMixture*>& gmpool = *pStatePool[use];
+  bjOt.resize(gmpool.size());
+
+  /* For each state */
+  for (unsigned j = 0; j < gmpool.size(); j++) {
+    if (!state_isUsed[j]) continue;
+
+    int mixsize = gmpool[j]->getNmix();
+    bjOt[j].resize(nframe);
+
+    if (mixsize == 1) { // single-Gaussian
+      for (int t = 0; t < nframe; t++)
+        bjOt[j][t] = bgOt[gmpool[j]->getGaussIdx(0)][t];
+
+    } else { // multi-Gaussians
+      vector<double> weight(gmpool[j]->getWeight());
+      for_each(weight.begin(), weight.end(), LOG);
+      bjOt[j].assign(nframe, LZERO);
+      for (int t = 0; t < nframe; t++) {/* For each frame */
+        for (int x = 0; x < mixsize; x++) {/* For each Gaussian */
+          int g = gmpool[j]->getGaussIdx(x);
+          bjOt[j][t] = LAdd(bjOt[j][t], LProd(weight[x], bgOt[g][t]));
+        } /* for each Gaussian */
+      } /* for each frame */
     }
-    tot_prob = LOG(tot_prob);
-    for (int j = 0; j < i_nstate; ++j) {
-      bjOt[j][t] -= tot_prob;
-    }
+
   }
-}
+  /* Recycle bgOt because it is memory wasted */
+  bgOt.clear();
+}/*}}}*/
 
-void HMM_GMM::CalLogCondToPostBjOt() {
-  int nframe = static_cast<int>(bjOt[0].size());
-  for (int t = 0; t < nframe; ++t) {
-    double tot_prob = 0.0;
-    for (int j = 0; j < i_nstate; ++j) {
-      bjOt[j][t] = EXP(bjOt[j][t]);
-      tot_prob += bjOt[j][t];
-    }
-    for (int j = 0; j < i_nstate; ++j) {
-      bjOt[j][t] /= tot_prob;
-    }
-  }
-}
-
-void HMM_GMM::CalLogAlpha(int nframe, vector<int> *p_label)/*{{{*/
-{
+void HMM_GMM::CalLogAlpha(int nframe, vector<int> *p_label) {/*{{{*/
   bool useLabel = (p_label != NULL);
 
   /* Init size */
@@ -1495,7 +1355,7 @@ void HMM_GMM::CalLogAlpha(int nframe, vector<int> *p_label)/*{{{*/
       alpha[i][0] = LZERO;
     else{
       int sno = useLabel ? (*p_label)[i] : i;
-      alpha[i][0] = LProd(pi[use][sno],  bjOt[sno][0]);
+      alpha[i][0] = LProd(pi[use][sno],  bjOt[v_state[sno]][0]);
     }
   }
 
@@ -1504,6 +1364,7 @@ void HMM_GMM::CalLogAlpha(int nframe, vector<int> *p_label)/*{{{*/
     for (unsigned j = 0; j < alpha.size(); j++) {
       alpha[j][t] = LZERO;
 
+      /* Transitted from (i_start ~ i_end) -> sno_j */
       int i_start = useLabel ? max(0, static_cast<int>(j-allowedNDel-1)) : 0;
       int i_end   = useLabel ? j+1 : i_nstate;
       int sno_j   = useLabel ? (*p_label)[j] : j;
@@ -1515,7 +1376,7 @@ void HMM_GMM::CalLogAlpha(int nframe, vector<int> *p_label)/*{{{*/
                            LProd(alpha[i][t-1], v_trans[sno_i][sno_j]));
       }
 
-      alpha[j][t] = LProd(alpha[j][t], bjOt[sno_j][t]);
+      alpha[j][t] = LProd(alpha[j][t], bjOt[v_state[sno_j]][t]);
     }
   }
 }/*}}}*/
@@ -1567,8 +1428,7 @@ void HMM_GMM::CalLogAlphaBound(int nframe, vector<int> *p_endf)/*{{{*/
   }
 }/*}}}*/
 
-void HMM_GMM::CalLogBeta(int nframe, vector<int> *p_label)/*{{{*/
-{
+void HMM_GMM::CalLogBeta(int nframe, vector<int> *p_label) {/*{{{*/
   bool useLabel = (p_label != NULL);
 
   /* Init size */
@@ -1587,15 +1447,14 @@ void HMM_GMM::CalLogBeta(int nframe, vector<int> *p_label)/*{{{*/
   }
 
   /* nextbeta is used to avoid repeated calculation */
-  vector<double> nextbeta;
-  nextbeta.resize(beta.size());
+  vector<double> nextbeta(i_nstate);
 
   /* Fill the table */
   for (int t = nframe-2; t >= 0; t--) {
     /* Calculate nextbeta */
     for (unsigned j = 0; j < beta.size(); j++) {
       int sno_j = useLabel ? (*p_label)[j] : j;
-      nextbeta[j] = LProd(beta[j][t+1], bjOt[sno_j][t+1]);
+      nextbeta[j] = LProd(beta[j][t+1], bjOt[v_state[sno_j]][t+1]);
     }
 
     for (unsigned i = 0; i < beta.size(); i++) {
@@ -1706,38 +1565,39 @@ void HMM_GMM::CalLogGamma(int nframe)/*{{{*/
 
 }/*}}}*/
 
-void HMM_GMM::CalLogEpsilon(int nframe, vector<int> *p_label)/*{{{*/
-{
+void HMM_GMM::CalLogEpsilon(int nframe, vector<int> *p_label) {/*{{{*/
   bool useLabel = (p_label != NULL);
-  int nframe_1 = nframe-1;
-  epsilon.resize(alpha.size());
+  epsilon.resize(i_nstate);
   for (unsigned i = 0; i < epsilon.size(); i++) {
-    epsilon[i].resize(alpha.size());
+    epsilon[i].resize(i_nstate);
     for (unsigned j = 0; j < epsilon[i].size(); j++)
-      epsilon[i][j].resize(nframe_1);
+      epsilon[i][j].resize(nframe - 1);
   }
 
-  for (int t = 0; t < nframe_1; t++) {
+  for (int t = 0; t < nframe - 1; t++) {
     for (unsigned j = 0; j < epsilon.size(); j++) {
       int sno_j = useLabel ? (*p_label)[j] : j;
-      double bjot_beta_prO = LDiv(LProd(bjOt[sno_j][t+1], beta[j][t+1]), prO);
+      double bjot_beta_prO = LDiv(
+          LProd(bjOt[v_state[sno_j]][t+1], beta[j][t+1]), prO);
       int i_start = useLabel ? max(0u,j-allowedNDel-1) : 0;
       int i_end   = useLabel ? j+1 : i_nstate;
       for (int i = i_start; i < i_end; i++) {
         int sno_i = useLabel ? (*p_label)[i] : i;
+
         if (v_trans[sno_i][sno_j] < LSMALL) {
           epsilon[i][j][t] = LZERO;
-          continue;
+        } else {
+          epsilon[i][j][t] = LProd(
+              LProd(alpha[i][t], v_trans[sno_i][sno_j]), bjot_beta_prO);
         }
-        epsilon[i][j][t] = LProd(LProd(alpha[i][t], v_trans[sno_i][sno_j]), bjot_beta_prO);
-      }
-    }
-  }
 
+      } /* for i */
+    } /* for j */
+  } /* for t */
+  /* epsilon = logp(O, qt: i->j) */
 }/*}}}*/
 
-void HMM_GMM::CalLogEpsilonBound(int nframe, vector<int> *p_endf)/*{{{*/
-{
+void HMM_GMM::CalLogEpsilonBound(int nframe, vector<int> *p_endf) {/*{{{*/
   vector<int> &endf = *p_endf;
   /* Allocate memory */
   int nframe_1 = nframe-1;
@@ -1775,8 +1635,7 @@ void HMM_GMM::CalLogEpsilonBound(int nframe, vector<int> *p_endf)/*{{{*/
 
 }/*}}}*/
 
-void HMM_GMM::AccumPi(vector<int> *p_label, double obs_weight)/*{{{*/
-{
+void HMM_GMM::AccumPi(vector<int> *p_label, double obs_weight) {/*{{{*/
   int unuse = 1-use;
   bool useLabel = (p_label != NULL);
   int sno;
@@ -1789,8 +1648,7 @@ void HMM_GMM::AccumPi(vector<int> *p_label, double obs_weight)/*{{{*/
   pthread_mutex_unlock(&H_mutex);
 }/*}}}*/
 
-void HMM_GMM::AccumIJ(int nframe, vector<int> *p_label, double obs_weight)/*{{{*/
-{
+void HMM_GMM::AccumIJ(int nframe, vector<int> *p_label, double obs_weight) {/*{{{*/
   int nframe_1 = nframe - 1;
   bool useLabel = (p_label != NULL);
 
@@ -1803,36 +1661,31 @@ void HMM_GMM::AccumIJ(int nframe, vector<int> *p_label, double obs_weight)/*{{{*
     for (int j = j_start; j < j_end; j++) {
       int sno_j = useLabel ? (*p_label)[j] : j;
       if (v_trans[sno_i][sno_j] < LSMALL) continue;
-      for (int t = 0; t < nframe_1; t++)
-        // We do not accumulate gamma[i][:] because
-        // the sum of accum_ij[i][:] = gamma[i][:].
-        // Hence normalize accum_ij is actually dividing
-        // the sum of gamma[i][:]
+      for (int t = 0; t < nframe_1; t++) {
         accum_ij[sno_i][sno_j] += obs_weight * epsilon[i][j][t];
+      }
     }
   }
   pthread_mutex_unlock(&H_mutex);
 }/*}}}*/
 
-void HMM_GMM::AccumWeightGaussian(float **obs, int nframe, int dim, UpdateType udtype, vector<int> *p_label, double obs_weight)/*{{{*/
-{
+void HMM_GMM::AccumWeightGaussian(float **obs, int nframe, int dim, /*{{{*/
+                                  UpdateType udtype, vector<int> *p_label,
+                                  double obs_weight) {
   bool useLabel = (p_label != NULL);
 
   /* For each state */
   for (unsigned i = 0; i < gamma.size(); i++) {
     int sno_i = useLabel ? (*p_label)[i] : i;
     GaussianMixture *state = getpGM(sno_i,UNUSE);
-    /* For each gaussian associated with this state*/
+    /* For each gaussian associated with this state */
     for (int x = 0; x < state->getNmix(); x++) {
       Gaussian *pg = state->getpGauss(x);
       for (int t = 0; t < nframe; t++) {
-        double gamma_i_x_t = obs_weight * gamma[i][t] * px_s[sno_i][x][t];
+        double gamma_i_x_t = obs_weight * gamma[sno_i][t] * px_s[sno_i][x][t];
         if (gamma_i_x_t <= ZERO) continue;
         pg->AddData(obs[t],dim,gamma_i_x_t,udtype);
-        // Here we do not divide by sum_gamma[i] because
-        // the total sum of weights in state i is
-        // actually sum_gamma[i]
-        state->setWeight(x,gamma_i_x_t, ADD);
+        state->setWeight(x, gamma_i_x_t, ADD);
       }
     }
   }
@@ -1851,8 +1704,7 @@ double HMM_GMM::normPi(UseType u)/*{{{*/
 
 }/*}}}*/
 
-void HMM_GMM::normTrans()/*{{{*/
-{
+void HMM_GMM::normTrans() {/*{{{*/
   for (int i = 0; i < i_nstate; i++) {
     double sum = 0.0;
     /* Calculate nonZERO transition sum */
@@ -1944,39 +1796,38 @@ void HMM_GMM::normRTrans()/*{{{*/
   }
 }/*}}}*/
 
-void HMM_GMM::accum2Trans()/*{{{*/
-{
-  for (int i = 0; i < i_nstate; i++)
-    for (int j = 0; j < i_nstate; j++)
-      if (accum_ij[i][j] < ZERO) accum_ij[i][j] = 0.0;
+void HMM_GMM::accum2Trans() {/*{{{*/
 
   for (int i = 0; i < i_nstate; i++) {
+
+    /* Accumulate transition from state i */
     double sum = 0.0;
-    for (int j = 0; j < i_nstate; j++) {
+    for (int j = 0; j < i_nstate; j++)
       if (accum_ij[i][j] > ZERO) sum += accum_ij[i][j];
-    }
+
+    /* Truncate small transitions */
     double trans_floor = (sum - accum_ij[i][i]) * TRANS_ZERO / i_nstate;
     sum = 0.0;
     for (int j = 0; j < i_nstate; j++) {
-      if (accum_ij[i][j] >= trans_floor) sum += accum_ij[i][j];
+      if (accum_ij[i][j] > trans_floor) sum += accum_ij[i][j];
     }
+
     if (sum < ZERO) {
-      cerr << "no occupation for state no " << i
-        << ", transition set to zero" << endl;
+      cerr << "Warning: accum2Trans() occupation[state " << i
+        << "] too small " << endl;
+      v_trans[i].assign(i_nstate, 0.0);
+      v_trans[i][i] = 1.0;
+    } else {
+      /* Normalize transitions */
       for (int j = 0; j < i_nstate; j++) {
-        cout << "v_trans[" << i << "][" << j << "] = " << v_trans[i][j] << endl;
-        v_trans[i][j] = 0.0;
-      }
-    }
-    else{
-      for (int j = 0; j < i_nstate; j++) {
-        if (accum_ij[i][j] >= trans_floor)
+        if (accum_ij[i][j] > trans_floor)
           v_trans[i][j] = accum_ij[i][j] / sum;
         else v_trans[i][j] = 0.0;
       }
     }
   }
 
+#if 0
   for (int j = 0; j < i_nstate; j++) {
     double sum = 0.0;
     for (int i = 0; i < i_nstate; i++) {
@@ -1993,6 +1844,7 @@ void HMM_GMM::accum2Trans()/*{{{*/
       else v_rtrans[i][j] = 0.0;
     }
   }
+#endif
 
 }/*}}}*/
 
@@ -2059,8 +1911,9 @@ void HMM_GMM::dump_var()/*{{{*/
 
 }/*}}}*/
 
-void HMM_GMM::EMUpdate(set<int> *p_delete_list, double backoff_weight, UpdateType udtype)/*{{{*/
-{
+void HMM_GMM::EMUpdate(set<int> *p_delete_list,/*{{{*/
+                       double backoff_weight,
+                       UpdateType udtype) {
   assert(backoff_weight >= 0 && backoff_weight <= 1);
   /**** Pi ****/
   normPi(UNUSE);
@@ -2080,7 +1933,7 @@ void HMM_GMM::EMUpdate(set<int> *p_delete_list, double backoff_weight, UpdateTyp
   /**** Gaussians ****/
   vector<Gaussian *> &vGauss = *(getpGM(0,UNUSE)->getpGaussPool());
   vector<Gaussian *> &vGauss_old = *(getpGM(0,USE)->getpGaussPool());
-  //bool enoughTrain;
+
   for (unsigned g = 0; g < vGauss.size(); g++) {
     if (!gauss_isUsed[g]) continue;
     // all backoff
@@ -2095,7 +1948,7 @@ void HMM_GMM::EMUpdate(set<int> *p_delete_list, double backoff_weight, UpdateTyp
     else if (udtype == UpdateCov)
       vGauss[g]->CopyCov(*vGauss_old[g]);
 
-    // 2. The rest is taken cared of by normMeanCov()
+    // 2. The rest is taken care of by normMeanCov()
     if (!vGauss[g]->normMeanCov(true, udtype)) {
       // Not enough training data
       cerr << "Gaussian[" << g << "] forced backoff.\n";
@@ -2115,6 +1968,7 @@ void HMM_GMM::EMUpdate(set<int> *p_delete_list, double backoff_weight, UpdateTyp
   }
   use = 1 - use;
   isLog = false;
+  SyncLeft();
 
 }/*}}}*/
 
@@ -2223,55 +2077,10 @@ void HMM_GMM::AccumFromThread(const HMM_GMM &model)/*{{{*/
 
 }/*}}}*/
 
-double HMM_GMM::CalDelta(vector<int> &state_seq, bool isEnd)/*{{{*/
-{
-  vector<vector<int> >path;
-  int nframe = bjOt[0].size();
-  int nframe_1 = nframe - 1;
-  delta.resize(i_nstate);
-  path.resize(i_nstate);
-  for (int i = 0; i < i_nstate; i++)
-  {
-    delta[i].resize(nframe);
-    path[i].resize(nframe);
-    delta[i][0] = pi[use][i] * bjOt[i][0];
-  }
-  for (int t = 1; t < nframe; t++) {
-    for (int j = 0; j < i_nstate; j++) {
-      delta[j][t] = 0.0;
-      path[j][t] = 0;
-      for (int i = 0; i < i_nstate; i++) {
-        if (v_trans[i][j] < ZERO) continue;
-        double newscore = delta[i][t-1] * v_trans[i][j];
-        if (newscore > delta[j][t]) {
-          delta[j][t] = newscore;
-          path[j][t] = i;
-        }
-      }
-      delta[j][t] *= bjOt[j][t];
-    }
-  }
-  /* backtrack */
-  state_seq.resize(nframe);
-  state_seq[nframe_1] = i_nstate-1;
-  double BestScore = delta.back().back();
-  if (!isEnd) {
-    for (int i = i_nstate - 2; i >= 0; i--) {
-      if (delta[i][nframe_1] > BestScore) {
-        BestScore = delta[i][nframe_1];
-        state_seq[nframe_1] = i;
-      }
-    }
-  }
-  for (int t = nframe - 2; t >= 0; t--) {
-    state_seq[t] = path[state_seq[t+1]][t+1];
-  }
-  return BestScore;
-}/*}}}*/
-
 double HMM_GMM::CalLogDelta(vector<int> &state_seq, /*{{{*/
                             vector<float>* likelihood_seq,
                             const vector<int> *p_endf) {
+  cout << "CalLogDelta()" << endl;
   bool bndConstraint = (p_endf != NULL);
   vector<vector<int> > path;
   int nframe = bjOt[0].size();
@@ -2279,11 +2088,12 @@ double HMM_GMM::CalLogDelta(vector<int> &state_seq, /*{{{*/
   /* Allocate memory */
   delta.resize(i_nstate);
   path.resize(i_nstate);
-  for (int i = 0; i < i_nstate; i++) {
-    delta[i].resize(nframe);
-    path[i].resize(nframe);
-    delta[i][0] = LProd(pi[use][i], bjOt[i][0]);
+  for (int j = 0; j < i_nstate; j++) {
+    delta[j].resize(nframe);
+    path[j].resize(nframe);
+    delta[j][0] = LProd(pi[use][j], bjOt[v_state[j]][0]);
   }
+  cout << "Fill table..." << std::flush;
   /* Fill the table */
   int i_end = 0;
   bool isBound = true;
@@ -2291,15 +2101,14 @@ double HMM_GMM::CalLogDelta(vector<int> &state_seq, /*{{{*/
   double newscore;
   for (int t = 1; t < nframe; t++) {
     if (bndConstraint) {
-      isBound = (t-1 == (*p_endf)[i_end]);
-      if (isBound) i_end++;
+      if ((isBound = (t-1 == (*p_endf)[i_end]))) i_end++;
     }
     for (int j = 0; j < i_nstate; j++) {
-      delta[j][t] = LZERO;
-      // inside a segment
-      if (!isBound) {
-        delta[j][t] = LProd(delta[j][t-1], v_trans[j][j]);
-        path[j][t] = j;
+      // default: self-transition
+      delta[j][t] = LProd(delta[j][t-1], v_trans[j][j]);
+      path[j][t] = j;
+
+      if (!isBound) {// inside segment: only left-to-right on neucli states
         if ((left_i = getLeft(j)) != -1) {
           newscore = LProd(delta[left_i][t-1], v_trans[left_i][j]);
           if (newscore > delta[j][t]) {
@@ -2307,33 +2116,111 @@ double HMM_GMM::CalLogDelta(vector<int> &state_seq, /*{{{*/
             path[j][t] = left_i;
           }
         }
-      }
-      // between segments
-      else {
-        for (int i = 0; i < i_nstate; i++) {
-          if (v_trans[i][j] <= LSMALL) continue;
-          newscore = LProd(delta[i][t-1], v_trans[i][j]);
+
+      } else {// between segments: left-to-right | boundary trans
+        if ((left_i = getLeft(j)) != -1) { // left-to-right
+          newscore = LProd(delta[left_i][t-1], v_trans[left_i][j]);
           if (newscore > delta[j][t]) {
             delta[j][t] = newscore;
-            path[j][t] = i;
+            path[j][t] = left_i;
+          }
+        } else { // boundary trans
+          for (int i = 0; i < i_nstate; i++) {
+            if (v_trans[i][j] <= LSMALL) continue;
+            newscore = LProd(delta[i][t-1], v_trans[i][j]);
+            if (newscore > delta[j][t]) {
+              delta[j][t] = newscore;
+              path[j][t] = i;
+            }
           }
         }
-      }
-      delta[j][t] = LProd(delta[j][t], bjOt[j][t]);
+
+      } /* if isBound, else */
+      delta[j][t] = LProd(delta[j][t], bjOt[v_state[j]][t]);
     }
   }
-  /* backtrack */
+  cout << "done\nBacktrace..." << std::flush;
+  /**** backtrace ****/
   state_seq.resize(nframe);
   if (likelihood_seq) likelihood_seq->resize(nframe);
-  //state_seq[nframe_1] = i_nstate-1;
   double BestScore = LZERO;
+
+  /* find optimal last state */
   for (int i = i_nstate - 1; i >= 0; i--) {
     if (getRight(i) == -1 && delta[i][nframe_1] > BestScore) {
       BestScore = delta[i][nframe_1];
       state_seq[nframe_1] = i;
-      //cout << "BestScore @ " << state_seq[nframe_1] << endl;
     }
   }
+
+  /* trace back */
+  if (likelihood_seq) (*likelihood_seq)[nframe_1] = BestScore;
+  for (int t = nframe - 2; t >= 0; t--) {
+    state_seq[t] = path[state_seq[t+1]][t+1];
+    if (likelihood_seq) (*likelihood_seq)[t] = delta[state_seq[t]][t];
+  }
+  /* HMM state index -> GM index */
+  /*
+  for (int t = 0; t < nframe; ++t) {
+    state_seq[t] = v_state[state_seq[t]];
+  }
+  */
+  cout << "done\nEnd" << endl;
+  return BestScore;
+}/*}}}*/
+
+double HMM_GMM::CalLogDelta(vector<int> &state_seq, /*{{{*/
+                            vector<float>* likelihood_seq) {
+  vector<vector<int> > path;
+  int nframe = bjOt[v_state[0]].size();
+  //assert(nframe > 0);
+  /* Allocate memory */
+  path.resize(i_nstate);
+  delta.resize(i_nstate);
+  for (unsigned j = 0; j < path.size(); j++) {
+    path[j].resize(nframe);
+    delta[j].resize(nframe);
+    delta[j][0] = LProd(pi[use][j], bjOt[v_state[j]][0]);
+  }
+  /* Fill the table */
+  int left_i;
+  double newscore;
+  for (int t = 1; t < nframe; t++) {
+    for (int j = 0; j < i_nstate; j++) {
+      // default: self-transition
+      //assert(j < delta.size());
+      //assert(t < delta[j].size());
+      delta[j][t] = LProd(delta[j][t-1], v_trans[j][j]);
+      path[j][t] = j;
+
+      //assert(j < v_left.size());
+      for (unsigned k = 0; k < v_left[j].size(); ++k) {
+        left_i = v_left[j][k];
+        newscore = LProd(delta[left_i][t-1], v_trans[left_i][j]);
+        if (newscore > delta[j][t]) {
+          delta[j][t] = newscore;
+          path[j][t] = left_i;
+        }
+      }
+
+      delta[j][t] = LProd(delta[j][t], bjOt[v_state[j]][t]);
+    }
+  }
+  /**** backtrace ****/
+  state_seq.resize(nframe);
+  if (likelihood_seq) likelihood_seq->resize(nframe);
+  double BestScore = LZERO;
+
+  /* find optimal last state */
+  int nframe_1 = nframe - 1;
+  for (int i = i_nstate - 1; i >= 0; i--) {
+    if (getRight(i) == -1 && delta[i][nframe_1] > BestScore) {
+      BestScore = delta[i][nframe_1];
+      state_seq[nframe_1] = i;
+    }
+  }
+
+  /* trace back */
   if (likelihood_seq) (*likelihood_seq)[nframe_1] = BestScore;
   for (int t = nframe - 2; t >= 0; t--) {
     state_seq[t] = path[state_seq[t+1]][t+1];
@@ -2342,13 +2229,6 @@ double HMM_GMM::CalLogDelta(vector<int> &state_seq, /*{{{*/
   return BestScore;
 }/*}}}*/
 
-#ifdef __TRAJECTORY__
-double HMM_GMM::CalLogDeltaTrajectory(vector<double> &state_seq) {/*{{{*/
-  /* Init transition states (2 states per transition)
-     tranState parameters: (a'S, a'Sb, a'Sa) */
-
-}/*}}}*/
-#endif /* __TRAJECTORY__ */
 
 /****** I/O ******/
 
@@ -2374,8 +2254,7 @@ void Gaussian::SaveGaussian(FILE *fp, const DataType type)/*{{{*/
   fprintf(fp,"EndGaussian\n");
 }/*}}}*/
 
-void Gaussian::LoadGaussian(FILE *fp)/*{{{*/
-{
+void Gaussian::LoadGaussian(FILE *fp) {/*{{{*/
   char buff[1024];
   fscanf(fp,"%s",buff);
   assert(strcmp(buff,"Gaussian") == 0);
@@ -2385,6 +2264,27 @@ void Gaussian::LoadGaussian(FILE *fp)/*{{{*/
   }else if (strcmp(buff,"binary")==0) {
     ReadBinary(fp);
   }else{
+    fprintf(stderr,"Unknown tag for Gaussian, only ascii/binary allowed\n");
+  }
+}/*}}}*/
+
+void Gaussian::LoadGaussian(ifstream& ifs) {/*{{{*/
+
+  string line, tag;
+  Getline(ifs, line);
+  stringstream iss(line);
+
+  iss >> tag;
+  assert(tag.compare("Gaussian") == 0);
+
+  iss >> tag;
+  if (tag.compare("ascii") == 0) {
+    ReadAscii(ifs);
+#if 0
+  } else if (tag.compare("binary") == 0) {
+    ReadBinary(ifs);
+#endif
+  } else {
     fprintf(stderr,"Unknown tag for Gaussian, only ascii/binary allowed\n");
   }
 }/*}}}*/
@@ -2436,6 +2336,61 @@ void Gaussian::ReadAscii(FILE *fp)/*{{{*/
   }
 }/*}}}*/
 
+void Gaussian::ReadAscii(ifstream& ifs) {/*{{{*/
+
+  string line, tag;
+  int i_val;
+  float f_val;
+
+  while (Getline(ifs, line)) {
+    stringstream iss(line);
+    iss >> tag;
+    if (tag.compare("EndGaussian") == 0) {
+      break;
+
+    } else if (tag.compare("name:") == 0) {
+      iss >> name;
+
+    } else if (tag.compare("dim:") == 0) {
+      iss >> i_val;
+      AllocateMem(i_val);
+
+    } else if (tag.compare("mean:") == 0) {
+      for (int r = 0; r < dim; r++) {
+        iss >> f_val;
+        p_mean->setEntry(r, 0, static_cast<double>(f_val));
+      }
+
+    } else if (tag.compare("cov") == 0) {
+
+      iss >> tag;
+      if (tag.compare("diag:") == 0)
+        isDiag = true;
+      else if (tag.compare("full:") == 0)
+        isDiag = false;
+      else
+        cerr << "Unknown flag \"mean " << tag << "\"\n";
+
+      for (int r = 0; r < dim; r++) {
+        Getline(ifs, line);
+        iss.str(line);
+        iss.clear();
+        iss >> f_val;
+        p_cov->setEntry(r, r, static_cast<double>(f_val));
+        if (!isDiag) {
+          for (int c = r + 1; c < dim; c++) {
+            iss >> f_val;
+            p_cov->setEntry(r,c,static_cast<double>(f_val));
+          }
+        }
+      }
+
+    } else {
+      ErrorExit(__FILE__, __LINE__, 1, "unknown tag ``%s''\n", tag.c_str());
+    }
+  }
+}/*}}}*/
+
 void Gaussian::ReadBinary(FILE *fp)/*{{{*/
 {
   char tag[1024];
@@ -2474,18 +2429,71 @@ void GaussianMixture::SaveGaussianMixture(FILE *fp, const DataType type)/*{{{*/
   display(fp);
 }/*}}}*/
 
-void GaussianMixture::LoadGaussianMixture(FILE *fp)/*{{{*/
-{
+void GaussianMixture::LoadGaussianMixture(FILE *fp) {/*{{{*/
   char buff[1024];
   fscanf(fp,"%s",buff);
   assert(strcmp(buff,"GaussianMixture") == 0);
   fscanf(fp,"%s",buff);
-  if (strcmp(buff,"ascii")==0) {
+  if (strcmp(buff,"ascii") == 0) {
     ReadAscii(fp);
-  }else if (strcmp(buff,"binary")==0) {
-    ReadBinary(fp);
-  }else{
+  } else {
     fprintf(stderr,"Unknown tag for GaussianMixture, only ascii/binary allowed\n");
+  }
+}/*}}}*/
+
+void GaussianMixture::LoadGaussianMixture(ifstream& ifs) {/*{{{*/
+
+  string line, tag;
+  Getline(ifs, line);
+  stringstream iss(line);
+
+  iss >> tag;
+  assert(tag.compare("GaussianMixture") == 0);
+
+  iss >> tag;
+  if (tag.compare("ascii") == 0) {
+    ReadAscii(ifs);
+  } else {
+    cerr << "Unknown tag: ``" << tag << "'' for GaussianMixture,"
+      << " only ``ascii'' allowed\n";
+  }
+
+}/*}}}*/
+
+void GaussianMixture::ReadAscii(ifstream& ifs) {/*{{{*/
+
+  string line, tag;
+  int i_val;
+
+  while (Getline(ifs, line)) {
+    stringstream iss(line);
+    iss >> tag;
+
+    if (tag.compare("EndGaussianMixture") == 0) {
+      break;
+
+    } else if (tag.compare("name:") == 0) {
+      iss >> s_name;
+
+    } else if (tag.compare("dim:") == 0) {
+      iss >> dim;
+
+    } else if (tag.compare("nmix:") == 0) {
+      iss >> i_val;
+      setNmix(i_val);
+
+    } else if (tag.compare("weight:") == 0) {
+      for (unsigned x = 0; x < v_weight.size(); x++)
+        iss >> v_weight[x];
+
+    } else if (tag.compare("gaussidx:") == 0) {
+      for (unsigned x = 0; x < v_gaussidx.size(); x++)
+        iss >> v_gaussidx[x];
+
+    } else {
+      ErrorExit(__FILE__, __LINE__, 1, "unknown tag ``%s''\n", tag.c_str());
+
+    }
   }
 }/*}}}*/
 
@@ -2523,11 +2531,6 @@ void GaussianMixture::ReadAscii(FILE *fp)/*{{{*/
   }
 }/*}}}*/
 
-void GaussianMixture::ReadBinary(FILE *fp)/*{{{*/
-{
-  fprintf(stderr,"Error: GaussianMixture::ReadBinary(FILE *fp) is not implemented.\n");
-}/*}}}*/
-
 void HMM_GMM::SaveHMM(FILE *fp, const DataType type)/*{{{*/
 {
   if (type == BINARY)
@@ -2535,24 +2538,35 @@ void HMM_GMM::SaveHMM(FILE *fp, const DataType type)/*{{{*/
   display(fp);
 }/*}}}*/
 
-void HMM_GMM::LoadHMM(FILE *fp)/*{{{*/
-{
+void HMM_GMM::LoadHMM(FILE *fp) {/*{{{*/
   char buff[1024];
   fscanf(fp,"%s",buff);
   assert(strcmp(buff,"HMM") == 0);
   fscanf(fp,"%s",buff);
   if (strcmp(buff,"ascii")==0) {
     ReadAscii(fp);
-  }else if (strcmp(buff,"binary")==0) {
-    ReadBinary(fp);
-  }else{
-    fprintf(stderr,"Unknown tag for HMM, only ascii/binary allowed\n");
+  } else {
+    fprintf(stderr,"Unknown tag for HMM, only ascii allowed\n");
   }
 }/*}}}*/
 
-void HMM_GMM::ReadBinary(FILE *fp)/*{{{*/
-{
-  fprintf(stderr,"Error: HMM_GMM::ReadBinary(FILE *fp) is not implemented.\n");
+void HMM_GMM::LoadHMM(ifstream& ifs) {/*{{{*/
+
+  string line, tag;
+  Getline(ifs, line);
+  stringstream iss(line);
+
+  iss >> tag;
+  assert(tag.compare("HMM") == 0);
+
+  iss >> tag;
+  if (tag.compare("ascii") == 0) {
+    ReadAscii(ifs);
+  } else {
+    cerr << "Unknown tag ``" << tag
+      << "'' for HMM, only ascii/binary allowed\n";
+  }
+
 }/*}}}*/
 
 void HMM_GMM::ReadAscii(FILE *fp)/*{{{*/
@@ -2573,7 +2587,7 @@ void HMM_GMM::ReadAscii(FILE *fp)/*{{{*/
       fscanf(fp,"%d",&i_val);
       setNstate(i_val);
     }
-    else if (strcmp(tag,"state:") == 0) {
+    else if (strcmp(tag,"state:") == 0 || strcmp(tag, "gmidx:") == 0) {
       for (unsigned i = 0; i < v_state.size(); i++)
         fscanf(fp,"%d",&v_state[i]);
     }
@@ -2585,10 +2599,17 @@ void HMM_GMM::ReadAscii(FILE *fp)/*{{{*/
       for (unsigned i = 0; i < left.size(); i++)
         fscanf(fp,"%d",&right[i]);
     }
-    else if (strcmp(tag,"pi:") == 0) {
+    else if (strcmp(tag,"pi:") == 0 || strcmp(tag,"pi dense:") == 0) {
       for (unsigned i = 0; i < pi[use].size(); i++) {
         fscanf(fp,"%f",&f_val);
         pi[use][i] = f_val;
+      }
+    }
+    else if (strcmp(tag,"pi sparse:") == 0) {
+
+      for (unsigned i = 0; i < pi[use].size(); i++) {
+        fscanf(fp,"%d:%f", &i_val, &f_val);
+        pi[use][i_val] = f_val;
       }
     }
     else if (strcmp(tag,"trans:") == 0) {
@@ -2613,6 +2634,95 @@ void HMM_GMM::ReadAscii(FILE *fp)/*{{{*/
   }
 }/*}}}*/
 
+void HMM_GMM::ReadAscii(ifstream& ifs) {/*{{{*/
+
+  string line, tag;
+  int i_val;
+  float f_val;
+
+  while (Getline(ifs, line)) {
+    stringstream iss(line);
+    iss >> tag;
+    if (tag.compare("EndHMM") == 0) {
+      break;
+
+    } else if (tag.compare("pdf_weight:") == 0) {
+      iss >> pdf_weight;
+
+    } else if (tag.compare("nstate:") == 0) {
+      iss >> i_val;
+      setNstate(i_val);
+
+    } else if (tag.compare( "gmidx:") == 0 || tag.compare("state:") == 0) {
+      for (unsigned i = 0; i < v_state.size(); i++)
+        iss >> v_state[i];
+
+    } else if (tag.compare("left:") == 0) { /* Will be derived from transp */
+      for (unsigned i = 0; i < left.size(); i++)
+        iss >> left[i];
+
+    } else if (tag.compare("right:") == 0) { /* Will be derived from transp */
+      for (unsigned i = 0; i < left.size(); i++)
+        iss >> right[i];
+
+    } else if (tag.compare("pi") == 0) {
+      iss >> tag;
+      if (tag.compare("dense:") == 0) {
+        for (unsigned i = 0; i < pi[use].size(); i++) iss >> pi[use][i];
+      } else if (tag.compare("sparse:") == 0) {
+        pi[use].assign(i_nstate, 0.0);
+        while (iss >> tag) { // tokens of pattern i:f
+          vector<string> val_pair = split(tag, ":");
+          i_val = atoi(val_pair[0].c_str());
+          f_val = atof(val_pair[1].c_str());
+          pi[use][i_val] = f_val;
+        }
+      } else {
+        cerr << "Unknown flag \"pi " << tag << "\"\n";
+      } /* if dense, sparse, else */
+
+    } else if (tag.compare("trans") == 0) {
+      iss >> tag;
+      if (tag.compare("dense:") == 0) {
+        for (unsigned i = 0; i < v_trans.size(); i++) {
+          Getline(ifs, line);
+          iss.str(line);
+          iss.clear();
+          v_trans[i].assign(istream_iterator<double>(iss),
+                            istream_iterator<double>());
+        }
+      } else if (tag.compare("sparse:") == 0) {
+        for (unsigned i = 0; i < v_trans.size(); i++) {
+          v_trans[i].assign(i_nstate, 0.0);
+          Getline(ifs, line);
+          iss.str(line);
+          iss.clear();
+          while (iss >> tag) { // tokens of pattern i:f
+            vector<string> val_pair = split(tag, ":");
+            i_val = atoi(val_pair[0].c_str());
+            f_val = atof(val_pair[1].c_str());
+            v_trans[i][i_val] = f_val;
+          }
+        }
+      } /* if dense, else */
+      SyncLeft();
+
+    } else {
+      ErrorExit(__FILE__, __LINE__, 1, "unknown tag ``%s''\n", tag.c_str());
+    }
+  }
+}/*}}}*/
+
+void HMM_GMM::SyncLeft() {/*{{{*/
+  v_left.assign(i_nstate, vector<int>());
+  for (int j = 0; j < i_nstate; ++j) {
+    for (int i = 0; i < i_nstate; ++i) {
+      if (i == j) continue;
+      if (v_trans[i][j] > ZERO) v_left[j].push_back(i);
+    }
+  }
+}/*}}}*/
+
 void SaveHMMGMG(string filename, HMM_GMM &model)/*{{{*/
 {
   vector<GaussianMixture*> &statePool = *(model.getpStatePool(USE));
@@ -2632,13 +2742,14 @@ void SaveHMMGMG(string filename, HMM_GMM &model)/*{{{*/
   fclose(fp);
 }/*}}}*/
 
+#if 0
 /* statePool[2], gaussPool[2] */
 void LoadHMMGMG(/*{{{*/
     string filename,
     HMM_GMM *p_model,
     vector<GaussianMixture*> *statePool,
-    vector<Gaussian*> *gaussPool
-    ) {
+    vector<Gaussian*> *gaussPool) {
+
   assert(p_model != 0);
 
 
@@ -2684,7 +2795,77 @@ void LoadHMMGMG(/*{{{*/
   fclose(fp);
 
 }/*}}}*/
+#endif
 
+/* statePool[2], gaussPool[2] */
+void LoadHMMGMG(/*{{{*/
+    string filename,
+    HMM_GMM *p_model,
+    vector<GaussianMixture*> *statePool,
+    vector<Gaussian*> *gaussPool) {
+
+  assert(p_model != 0);
+
+  ifstream ifs(filename.c_str(), ifstream::in);
+  if (!ifs.good()) {
+    ErrorExit(__FILE__, __LINE__, -1,
+              "Unable to open file %s with flag ifstream::in\n",
+              filename.c_str());
+  }
+
+  string tag, line;
+  int i_val;
+  while (Getline(ifs, line)) {
+    if (line.empty()) continue;
+
+    stringstream ss(line);
+    ss >> tag;
+
+    if (tag.compare("HMMSet") == 0) {
+      ss >> i_val;
+      if (i_val != 1)
+        ErrorExit(__FILE__,__LINE__,-1,"LoadHMMGMG() can only read 1 HMM");
+      p_model->LoadHMM(ifs);
+
+    } else if (tag.compare("StateSet") == 0 ||
+               tag.compare("GaussianMixtureSet") == 0) {
+      ss >> i_val;
+      statePool[0].resize(i_val);
+      statePool[1].resize(i_val);
+      for (int i = 0; i < i_val; i++) {
+        statePool[0][i] = new GaussianMixture();
+        statePool[0][i]->LoadGaussianMixture(ifs);
+        statePool[0][i]->setpGaussPool(&gaussPool[0]);
+        statePool[1][i] = new GaussianMixture(statePool[0][i]->getDim(),
+                                              statePool[0][i]->getNmix(),
+                                              &gaussPool[1]);
+        statePool[1][i]->copyGaussIdx(statePool[0][i]);
+        statePool[1][i]->setpGaussPool(&gaussPool[1]);
+      }
+
+    } else if (tag.compare("GaussianSet") == 0) {
+      ss >> i_val;
+      gaussPool[0].resize(i_val);
+      gaussPool[1].resize(i_val);
+      for (int i = 0; i < i_val; i++) {
+        gaussPool[0][i] = new Gaussian();
+        gaussPool[0][i]->LoadGaussian(ifs);
+        gaussPool[1][i] = new Gaussian(gaussPool[0][i]->getDim());
+      }
+
+    } else {
+      ErrorExit(__FILE__, __LINE__, -1, "Unknown tag: ``%s''\n", tag.c_str());
+    }
+  }
+  p_model->setpStatePool(&statePool[0],USE);
+  p_model->setpStatePool(&statePool[1],UNUSE);
+  p_model->setpGaussPool(&gaussPool[0],USE);
+  p_model->setpGaussPool(&gaussPool[1],UNUSE);
+  ifs.close();
+
+}/*}}}*/
+
+#if 0
 void LoadHMMGMG(/*{{{*/
     string filename,
     HMM_GMM *p_model,
@@ -2728,6 +2909,63 @@ void LoadHMMGMG(/*{{{*/
   p_model->setpStatePool(&statePool,USE);
   p_model->setpGaussPool(&gaussPool,USE);
   fclose(fp);
+}/*}}}*/
+#endif
+
+void LoadHMMGMG(/*{{{*/
+    string filename,
+    HMM_GMM *p_model,
+    vector<GaussianMixture*> &statePool,
+    vector<Gaussian*> &gaussPool) {
+
+  assert(p_model != 0);
+
+  ifstream ifs(filename.c_str(), ios::in);
+  if (!ifs.good()) {
+    ErrorExit(__FILE__, __LINE__, -1,
+              "Unable to open file %s with flag ifstream::in\n",
+              filename.c_str());
+  }
+
+  string tag, line;
+  int i_val;
+  while (Getline(ifs, line)) {
+    if (line.empty()) continue;
+
+    stringstream ss(line);
+    ss >> tag;
+
+    if (tag.compare("HMMSet") == 0) {
+      ss >> i_val;
+      if (i_val != 1)
+        ErrorExit(__FILE__,__LINE__,-1,"LoadHMMGMG() can only read 1 HMM");
+      p_model->LoadHMM(ifs);
+
+    } else if (tag.compare("StateSet") == 0 ||
+               tag.compare("GaussianMixtureSet") == 0) {
+      ss >> i_val;
+      statePool.resize(i_val);
+      for (int i = 0; i < i_val; i++) {
+        statePool[i] = new GaussianMixture();
+        statePool[i]->LoadGaussianMixture(ifs);
+        statePool[i]->setpGaussPool(&gaussPool);
+      }
+    }
+    else if (tag.compare("GaussianSet") == 0) {
+      ss >> i_val;
+      gaussPool.resize(i_val);
+      for (int i = 0; i < i_val; i++) {
+        gaussPool[i] = new Gaussian();
+        gaussPool[i]->LoadGaussian(ifs);
+      }
+
+    } else {
+      ErrorExit(__FILE__, __LINE__, 1, "unknown tag ``%s''\n", tag.c_str());
+    }
+  }
+  p_model->setpStatePool(&statePool,USE);
+  p_model->setpGaussPool(&gaussPool,USE);
+  ifs.close();
 }/*}}}*/
 
 bool DeleteState(unsigned idx, HMM_GMM &model, set<int> &state_recycler, set<int> &gauss_recycler) {/*{{{*/

@@ -129,8 +129,7 @@ class Labfile { /*{{{*/
 
 enum G_type {DIAG, FULL};
 
-class Gaussian /*{{{*/
-{
+class Gaussian {/*{{{*/
   public:
     Gaussian() { Init(); }
     Gaussian(const Gaussian &g);
@@ -183,9 +182,10 @@ class Gaussian /*{{{*/
       double logProb(const _Tp *data, int dim, bool islog = true) const;
     template<typename _Tp1, typename _Tp2>
     double Bhat(const _Tp1 *data1, const _Tp2 *data2, const int dim) const;
-    void display(FILE *fp) const;
-    void SaveGaussian(FILE *fp, const DataType type);
-    void LoadGaussian(FILE *fp);
+    void display(FILE* fp) const;
+    void SaveGaussian(FILE* fp, const DataType type);
+    void LoadGaussian(FILE* fp);
+    void LoadGaussian(ifstream& ifs);
 
   private:
     void Init();
@@ -196,9 +196,11 @@ class Gaussian /*{{{*/
       Init();
     }
     void ReadAscii(FILE *fp);
+    void ReadAscii(ifstream& ifs);
     void ReadBinary(FILE *fp);
 
     // Data
+    string name;
     int dim;
     Matrix *p_mean;
     Matrix *p_cov;
@@ -214,8 +216,7 @@ class Gaussian /*{{{*/
 };
 /*}}}*/
 
-class GaussianMixture /*{{{*/
-{
+class GaussianMixture { /*{{{*/
   public:
     GaussianMixture() {Init(0,0,0);}
     GaussianMixture(int d, int m, vector<Gaussian *> *p) {Init(d,m,p);}
@@ -239,23 +240,24 @@ class GaussianMixture /*{{{*/
     void setGaussIdx(unsigned x, unsigned idx);
     void copyGaussIdx(const GaussianMixture *pstate);
     void setpGaussPool(vector<Gaussian *> *ptr) { pGaussPool = ptr;}
-    void setWeight(int x, double val, SetType s); 
-    void copyWeight(GaussianMixture &s); 
+    void setWeight(int x, double val, SetType s);
+    void copyWeight(GaussianMixture &s);
     void UniformWeight();
     bool cancelGaussIdx(int idx);
     void setName(const char *str) { s_name = str; }
     void setName(const string str) { s_name = str; }
     static void setRequiredFrame(double r) { REQUIRED_FRAME = r; }
     // Clear value
-    void ClearWeight();
+    void ClearWeight(double val);
     // Normalization
     bool normWeight(double &weightsum);
     void display(FILE *fp) const;
-    void SaveGaussianMixture(FILE *fp, const DataType type = ASCII);
-    void LoadGaussianMixture(FILE *fp);
+    void SaveGaussianMixture(FILE* fp, const DataType type = ASCII);
+    void LoadGaussianMixture(FILE* fp);
+    void LoadGaussianMixture(ifstream& ifs);
   private:
     void ReadAscii(FILE *fp);
-    void ReadBinary(FILE *fp);
+    void ReadAscii(ifstream& ifs);
 
     /* Data */
     int dim;
@@ -304,7 +306,8 @@ class HMM_GMM /*{{{*/
     bool getGisUsed(int g) const { return gauss_isUsed[g]; }
     bool getSisUsed(int sid) const { return state_isUsed[sid]; }
     double get_pdf_weight() const { return pdf_weight; }
-    double getPrO() const {return prO; }
+    double getPrO() const { return prO; }
+    const vector<int>& getVstate() const { return v_state; }
     /* Dump all EM-related variables */
     void dump_param() const;
     void display(FILE *fp) const;
@@ -352,9 +355,9 @@ class HMM_GMM /*{{{*/
      ****************************************************/
     void CopyForThread(const HMM_GMM &model);
     /********** Clear value **************/
-    void ClearPi(UseType u);
-    void ClearIJ();
-    void ClearTrans();
+    void ClearPi(UseType u, double val);
+    void ClearIJ(double val);
+    void ClearTrans(double val);
     /**************** EM *****************/
     void SyncUsed();
     void EMInitIter();
@@ -396,37 +399,31 @@ class HMM_GMM /*{{{*/
                       int dim);
 
     void CalLogBjOtPxs(int nframe);
+    void CalLogBjOt(int nframe);
+    template<typename _Tp> void CalLogBjOt(int nframe, TwoDimArray<_Tp> *table);
     void CalLogAlpha(int nframe, vector<int> *p_state_seq = NULL);
     void ViteInit();
     double CalDelta(vector<int> &, bool isEnd);
     double CalLogDelta(vector<int>& state_seq,
-                       vector<float>* likelihood_seq = NULL,
-                       const vector<int> *p_endf = NULL); // Use pi, bjOt, v_trans
+                       vector<float>* likelihood_seq,
+                       const vector<int> *p_endf); // Use pi, bjOt, v_trans
+    double CalLogDelta(vector<int>& state_seq,
+                       vector<float>* likelihood_seq = NULL); // Use pi, bjOt, v_trans
     void CalLogPrO(int nframe, vector<int> *p_label = NULL);
-    template<typename _Tp>
-    void CalLogBjOt(int nframe, TwoDimArray<_Tp> *table);
 
     /************** Some special functions **********/
     void CalLogCondToPostBjOt();
     void CalLogCondToLogPostBjOt();
     /************** I/O **************/
     void SaveHMM(FILE *fp, const DataType type);
-    void LoadHMM(FILE *fp);
+    void LoadHMM(FILE* fp);
+    void LoadHMM(ifstream& ifs);
 
   private:
     void Init();
     void ReadAscii(FILE *fp);
-    void ReadBinary(FILE *fp);
-#ifdef NODEF
-    void CalBgOt(float **obs, int nframe, int dim);
-    void CalBjOtPxs();
-    void CalAlpha();
-    void CalBeta();
-    void CalPrO();
-    void CalGamma();
-    void CalSumGamma();
-    void CalEpsilon();
-#endif
+    void ReadAscii(ifstream& ifs);
+    void SyncLeft();
 
     /* Log scale calculation */
     void CalLogAlphaBound(int nframe, vector<int> *p_endf);
@@ -480,6 +477,7 @@ class HMM_GMM /*{{{*/
     int use;
     vector<int> v_state;                      // vector of state index
     vector<int> left, right;
+    vector<vector<int> > v_left;
     vector<double> pi[2];                     // initial prob
     vector<vector<double> > v_trans;          // transition prob
     vector<vector<double> > v_rtrans;         // reverse trans prob
@@ -544,7 +542,7 @@ double HMM_GMM::EMObs(typename vector<vector<_Tp> >::const_iterator start,
   CalLogBeta(nframe);               // Use trans bjot; +beta
   CalLogPrO(nframe);                // Use alpha; +prO;
   CalLogGamma(nframe);              // Use alpha beta prO; +gamma
-  CalLogEpsilon(nframe);            // Use alpha beta trans bjot prO; +epsilon
+  CalLogEpsilon(nframe);            // Use alpha beta trans bjot prO; +epsilon = logp(O, qt:i->j)
   ExpPxs();
   ExpGamma();
   ExpEpsilon();
@@ -607,7 +605,7 @@ void HMM_GMM::AccumWeightGaussian(
       for (int t = 0; t < nframe; t++) {
         typename vector<vector<_Tp> >::const_iterator itr = start + t;
         const _Tp* obs = &(*itr)[0];
-        double gamma_i_x_t = obs_weight * gamma[i][t] * px_s[sno_i][x][t];
+        double gamma_i_x_t = obs_weight * gamma[sno_i][t] * px_s[v_state[sno_i]][x][t];
         if (gamma_i_x_t <= ZERO) continue;
         pg->AddData(obs, dim, gamma_i_x_t, udtype);
         // Here we do not divide by sum_gamma[i] because
@@ -667,17 +665,22 @@ void Gaussian::AddData(_Tp *data, /*{{{*/
 
   numframe++;
   weight += prob;
-  for (int r = 0; r < dim; r++) {
-    double val = prob * data[r];
-    if (udtype == UpdateAll || udtype == UpdateMean)
-      p_mean->setEntryPlus(r,0,val);
-    if (udtype == UpdateAll || udtype == UpdateCov) {
+  if (udtype == UpdateAll) {
+    for (int r = 0; r < dim; r++) {
+      double val = prob * data[r];
+      p_mean->setEntryPlus(r, 0, val);
       p_cov->setEntryPlus(r,r, val * data[r]);
       if (!isDiag) {
         for (int c = r+1; c < dim; c++)
           p_cov->setEntryPlus(r,c, val * data[c]);
       }
     }
+  } else if (udtype == UpdateMean) {
+    for (int r = 0; r < dim; r++) {
+      p_mean->setEntryPlus(r, 0, prob * data[r]);
+    }
+  } else if (udtype == UpdateCov) {
+    assert(false);
   }
 
   pthread_mutex_unlock(&G_mutex);
@@ -687,23 +690,34 @@ void Gaussian::AddData(_Tp *data, /*{{{*/
 template<typename _Tp>
 void HMM_GMM::CalLogBjOt(int nframe, TwoDimArray<_Tp> *ptab) {/*{{{*/
   TwoDimArray<_Tp>& table = *ptab;
-  table.Resize(i_nstate, nframe);
+  vector<GaussianMixture*>& gmpool = *pStatePool[use];
+  table.Resize(gmpool.size(), nframe);
   table.Memfill(LZERO);
+
   /* For each state */
-  for (int j = 0; j < i_nstate; ++j) {
-    GaussianMixture* state = getpGM(j,USE);
-    /* Calculate Log weight */
-    vector<double> weight(state->getWeight());
-    for_each(weight.begin(), weight.end(), EXP);
-    int mixsize = state->getNmix();
-    for (int t = 0; t < nframe; ++t) {
-      /* sum_{x = 1}^{mixsize} (weight_x * bgot) */
-      for (int x = 0; x < mixsize; ++x) {
-        _Tp bgot =  LProd(weight[x], bgOt[state->getGaussIdx(x)][t]);
-        table(j, t) = LAdd(table(j, t), bgot);
-      }
-    }
-  }
+  for (unsigned j = 0; j < gmpool.size(); ++j) {
+    if (!state_isUsed[j]) continue;
+    int mixsize = gmpool[j]->getNmix();
+
+    if (mixsize == 1) { // single-Gaussian
+      for (int t = 0; t < nframe; ++t)
+        table(j, t) = bgOt[gmpool[j]->getGaussIdx(0)][t];
+
+    } else { // multi-Gaussian
+      vector<double> weight(gmpool[j]->getWeight());
+      for_each(weight.begin(), weight.end(), LOG);
+      for (int t = 0; t < nframe; ++t) { /* for each frame */
+        for (int x = 0; x < mixsize; ++x) { /* for each Gaussian */
+          int g = gmpool[j]->getGaussIdx(x);
+          table(j, t) = LAdd(table(j, t), LProd(weight[x], bgOt[g][t]));
+        } /* for each Gaussian */
+      } /* for each frame */
+
+    } /* if mixsize == 1, else */
+  } /* for j */
+
+  /* Recycle bgOt */
+  bgOt.clear();
 }/*}}}*/
 
 void SaveHMMGMG(string filename, HMM_GMM &model);
