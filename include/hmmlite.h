@@ -18,14 +18,6 @@
 #define float_inf std::numeric_limits<float>::infinity()
 
 
-const double LOG2PI  = 1.83787707;
-const double PI      = 3.14159265358979;
-const double TPI     = 6.28318530717959;     /* PI*2 */
-const double LZERO   = -1.0E10;    /* ~log(0) */
-const double LSMALL  = -0.99E10;
-const double MINEARG = -708.3;     /* lowest exp() arg  = log(MINLARG) */
-const double MINLARG = 2.45E-308;  /* lowest log() arg  = exp(MINEARG) */
-const double ZERO    = 1e-20;
 enum UseType { USE, UNUSE};
 enum SetType { ADD, SET};
 enum DataType{ ASCII, BINARY};
@@ -33,99 +25,6 @@ enum UpdateType { UpdateAll, UpdateMean, UpdateCov };
 
 using namespace std;
 using namespace atlas;
-
-double LAdd(double x, double y);
-double LSub(double x, double y);
-double LProd( double loga, double logb);
-double LDiv( double loga, double logb);
-double LOG( double a);
-double EXP( double a);
-
-inline bool isEqual( double a, double b ) {
-  bool isequal = fabs(a - b) <=
-    min<float>(fabs(a), fabs(b)) * std::numeric_limits<double>::epsilon();
-  return isequal;
-}
-
-class Labfile { /*{{{*/
-  public:
-    Labfile() { Init(); }
-    Labfile(string filename) { LoadFile(filename); }
-    void Init();
-    void condense();
-    void push_back(int s, int e, int c, float f = float_inf);
-    void CopyLab( const Labfile &ref, const int start, const int end);
-    void LoadFile(string filename);
-    void SaveLab(string filename) {/*{{{*/
-      ofstream fs(filename.c_str());
-      if (fs.fail()) {
-        ErrorExit(__FILE__, __LINE__, -1, "unable to open file %s\n",
-                  filename.c_str());
-      }
-      SaveLab(fs);
-    }/*}}}*/
-    void SaveLab(ostream &fs) const;
-    void Reverse();
-    void DumpData(int start = 0, int last = -1) const {/*{{{*/
-      if (start < 0 || start >= num_lab)
-        start = 0;
-      if (last < 0 || last >= num_lab)
-        last = num_lab - 1;
-
-      cout << "====== Labfile.DumpData() ======\n";
-      for(int i = start; i <= last; i++) {
-        cout << i << ": "
-          << start_f[i] << " "
-          << end_f[i] << ' '
-          << cluster[i] << ' ';
-        if (!score.empty()) cout << score[i];
-        cout << endl;
-      }
-      cout << "num_lab: " << last - start + 1 << endl;
-    }/*}}}*/
-    void DumpData(vector<int> &seg_head_state,
-                  vector<int> &seg_tail_state) const {/*{{{*/
-      assert(seg_head_state.size() == seg_tail_state.size());
-      cout << "====== Labfile ======\n";
-      for(unsigned s = 0; s < seg_head_state.size(); s++) {
-        for(int i = seg_head_state[s]; i <= seg_tail_state[s]; i++) {
-          cout << "S" << i << "\ts" << start_f[i] << "\te" << end_f[i] << '\t' << cluster[i] << "\tSeg" << s << endl;
-        }
-      }
-      cout << "num_lab: " << num_lab << endl;
-    }/*}}}*/
-    void parseStateSeq(vector<int> &state_seq,
-                       vector<float>* likelihood_seq = NULL);
-    void parseStateSeq( vector<int> &state_seq, vector<int> &ref_end_f );
-    void expandMaxClust(unsigned *p_max_clust) {/*{{{*/
-      for(unsigned i = 0; i < cluster.size(); i++)
-        if(static_cast<unsigned>(cluster[i]) >= *p_max_clust)
-          *p_max_clust = cluster[i]+1;
-    }/*}}}*/
-    void incNumLab() { num_lab++; }
-    void setNumLab(int n) { num_lab=n; }
-    const char *getFname() const { return s_fname.c_str(); }
-    int getNumLab() const { return num_lab; }
-    int getStartF(int t) const { return start_f[t]; };
-    int getEndF(int t) const { return end_f[t]; };
-    int getDuration(int t) const { return end_f[t] - start_f[t] + 1; }
-    int getDuration_1(int t) const { return end_f[t] - start_f[t]; }
-    int getDuration(int s, int e) const { return end_f[e] - start_f[s] + 1; }
-    int getCluster(int t) const {
-      return t >= 0 ? cluster[t] : cluster[cluster.size() + t];
-    }
-    float getScore(int t) const { return score[t]; }
-    vector<int> *getpCluster() { return &cluster; }
-    vector<int> *getpStartf() { return &start_f; }
-    vector<int> *getpEndf() { return &end_f; }
-  private:
-    int num_lab;
-    string s_fname;
-    vector<int> start_f;
-    vector<int> end_f;
-    vector<int> cluster;
-    vector<float> score;
-};/*}}}*/
 
 enum G_type {DIAG, FULL};
 

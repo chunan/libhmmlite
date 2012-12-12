@@ -4,7 +4,7 @@ CXXFLAGS = -Iinclude -I../libatlas_wrapper/include -I../anguso_arg_parser/includ
 
 MACHINE = $(shell uname -m)
 
-SRC = hmmlite.cpp
+SRC = logarithmatics.cpp
 OBJ = $(addprefix obj/$(MACHINE)/,$(SRC:.cpp=.o))
 
 TARGET = lib/$(MACHINE)/libhmmlite.a
@@ -26,8 +26,7 @@ debug: $(TARGET)
 %.d: %.cpp
 	$(CC) -M $(CXXFLAGS) $< > $@
 
-lib/$(MACHINE)/libhmmlite.a: \
-	obj/$(MACHINE)/hmmlite.o
+lib/$(MACHINE)/libhmmlite.a: $(OBJ)
 	$(AR) rucs $@ $^
 
 obj/$(MACHINE)/%.o: src/%.cpp

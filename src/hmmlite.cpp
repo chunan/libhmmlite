@@ -63,61 +63,6 @@ static int gettag(FILE *fd, char *tag) {/*{{{*/
   return 1;
 }/*}}}*/
 
-double LAdd(double x, double y)/*{{{*/
-{
-  double diff;
-
-  if (x < y) swap(x, y);  // make sure x > y
-  diff = y - x;               // diff < 0
-  if (diff < MINEARG)
-    return (x <= LSMALL) ? LZERO : x ;
-  else
-    return x + log(1.0 + exp(diff));
-}/*}}}*/
-
-double LSub(double x, double y)/*{{{*/
-{
-  double diff,z;
-
-  if (x < y)
-    ErrorExit(__FILE__,__LINE__,-1,"LSub() get negative result\n");
-  diff = y - x;
-  if (diff < MINEARG)
-    return (x <= LSMALL) ? LZERO : x ;
-  else {
-    z = 1.0 - exp(diff);
-    return (z < MINLARG) ? LZERO : x + log(z);
-  }
-}/*}}}*/
-
-double LDiv(double loga, double logb)/*{{{*/
-{
-  if (logb <= LSMALL)
-    ErrorExit(__FILE__,__LINE__,-1,"LDiv divide by LZERO");
-  double z = loga - logb;
-  return (z <= LSMALL) ? LZERO : z;
-}/*}}}*/
-
-double LProd(double loga, double logb)/*{{{*/
-{
-  //if (loga <= LSMALL || logb <= LSMALL) return LZERO;
-  double z = loga + logb;
-  return (z <= LSMALL) ? LZERO : z;
-}/*}}}*/
-
-double LOG(double a)/*{{{*/
-{
-  if (a < MINLARG) return LZERO;
-  else return log(a);
-}/*}}}*/
-
-double EXP(double a)/*{{{*/
-{
-  if (a < MINEARG) return 0.0;
-  else return exp(a);
-}/*}}}*/
-
-
 void Labfile::LoadFile(string filename) {/*{{{*/
   s_fname = filename;
   int s_val, e_val, c_val;
