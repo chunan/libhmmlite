@@ -1,8 +1,9 @@
-#include "logarithmatics.h"
-#include "utility.h"
 #include <iostream>
 #include <cassert>
+#include <sstream>
+#include "logarithmetics.h"
 
+using std::stringstream;
 
 /* min log domain operatable point */
 const double LLDouble::LZERO   = -1.0E10;   /* ~log(0) */
@@ -12,7 +13,7 @@ const double LLDouble::MINLOGARG = -708.3;
 const double LLDouble::MINLINARG = 2.45E-308;
 
 
-LLDouble operator+(const LLDouble a, const LLDouble b) {/*{{{*/
+LLDouble operator+(const LLDouble& a, const LLDouble& b) {/*{{{*/
   assert(a._type == b._type);
 
   if (a._type == LLDouble::LINDOMAIN) {
@@ -30,22 +31,24 @@ LLDouble operator+(const LLDouble a, const LLDouble b) {/*{{{*/
 
 }/*}}}*/
 
-LLDouble operator-(const LLDouble a, const LLDouble b) {/*{{{*/
+LLDouble operator-(const LLDouble& a, const LLDouble& b) /*{{{*/
+  throw (LLDouble::MinusToNegExc) {
   assert(a._type == b._type);
 
   if (a._val < b._val) {
-    ErrorExit(__FILE__, __LINE__, -1,
-              "%f - %f < 0.0\n", a._val, b._val);
+    stringstream err;
+    err << "Error: " << a << " - " << b << " < 0.0";
+    throw LLDouble::MinusToNegExc(err.str());
   }
 
   if (a._type == LLDouble::LINDOMAIN) {
     return LLDouble(a._val - b._val, LLDouble::LINDOMAIN);
   } else {
-    double diff = b._val - a._val; // diff < 0.0
+    double diff = b._val - a._val; // diff <= 0.0
     if (diff < LLDouble::MINLOGARG) {
       return a;
     } else {
-      double z = a._val + log(1.0 - exp(diff));
+      double z = a._val + LLDouble::LOG(1.0 - exp(diff));
       if (z < LLDouble::LSMALL) z = LLDouble::LZERO;
       return LLDouble(z, LLDouble::LOGDOMAIN);
     }
@@ -53,7 +56,7 @@ LLDouble operator-(const LLDouble a, const LLDouble b) {/*{{{*/
 
 }/*}}}*/
 
-LLDouble operator*(const LLDouble a, const LLDouble b) {/*{{{*/
+LLDouble operator*(const LLDouble& a, const LLDouble& b) {/*{{{*/
   assert(a._type == b._type);
 
   if (a._type == LLDouble::LINDOMAIN) {
@@ -66,19 +69,22 @@ LLDouble operator*(const LLDouble a, const LLDouble b) {/*{{{*/
   }
 }/*}}}*/
 
-LLDouble operator/(const LLDouble a, const LLDouble b) {/*{{{*/
+LLDouble operator/(const LLDouble& a, const LLDouble& b) /*{{{*/
+  throw (LLDouble::DivideByZeroExc) {
   assert(a._type == b._type);
 
   if (a._type == LLDouble::LINDOMAIN) {
     if (b._val <= 0.0) {
-      ErrorExit(__FILE__, __LINE__, -1, "%f / %f divide by LZERO",
-                a._val, b._val);
+      stringstream err;
+      err << "Error: " << a << " / " << b << " divide by zero";
+      throw LLDouble::DivideByZeroExc(err.str());
     }
     return LLDouble(a._val / b._val, LLDouble::LINDOMAIN);
   } else {
     if (b._val <= LLDouble::LSMALL) {
-      ErrorExit(__FILE__, __LINE__, -1, "%f / %f (log) divide by LZERO",
-                a._val, b._val);
+      stringstream err;
+      err << "Error: " << a << " / " << b << " divide by zero";
+      throw LLDouble::DivideByZeroExc(err.str());
     }
     double z = a._val - b._val;
     return (z <= LLDouble::LSMALL)
@@ -86,6 +92,46 @@ LLDouble operator/(const LLDouble a, const LLDouble b) {/*{{{*/
       : LLDouble(z, LLDouble::LOGDOMAIN);
   }
 
+}/*}}}*/
+
+bool operator==(LLDouble a, LLDouble b) {/*{{{*/
+  if (a._type == LLDouble::LINDOMAIN || b._type == LLDouble::LINDOMAIN) {
+    a.to_lindomain();
+    b.to_lindomain();
+    return isEqual(a._val, b._val);
+  } else {
+    if (a._val < b._val) std::swap(a._val, b._val); // a >= b
+    a -= b;
+    return a._val < LLDouble::LSMALL;
+  }
+}/*}}}*/
+
+bool operator<=(LLDouble a, LLDouble b) {/*{{{*/
+  if (a._type == LLDouble::LINDOMAIN || b._type == LLDouble::LINDOMAIN) {
+    a.to_lindomain();
+    b.to_lindomain();
+    return (a._val <= b._val) || isEqual(a._val, b._val);
+  } else {
+    return (a._val <= b._val) || a == b;
+  }
+}/*}}}*/
+
+bool operator>=(LLDouble a, LLDouble b) {/*{{{*/
+  if (a._type == LLDouble::LINDOMAIN || b._type == LLDouble::LINDOMAIN) {
+    a.to_lindomain();
+    b.to_lindomain();
+    return (a._val >= b._val) || isEqual(a._val, b._val);
+  } else {
+    return (a._val >= b._val) || a == b;
+  }
+}/*}}}*/
+
+bool operator<(LLDouble a, LLDouble b) {/*{{{*/
+  return !(a >= b);
+}/*}}}*/
+
+bool operator>(LLDouble a, LLDouble b) {/*{{{*/
+  return !(a <= b);
 }/*}}}*/
 
 std::ostream& operator<<(std::ostream& os, const LLDouble& ref) {/*{{{*/
@@ -135,7 +181,8 @@ LLDouble& LLDouble::operator+=(const LLDouble& rhs) {/*{{{*/
   return *this;
 }/*}}}*/
 
-LLDouble& LLDouble::operator-=(const LLDouble& rhs) {/*{{{*/
+LLDouble& LLDouble::operator-=(const LLDouble& rhs) /*{{{*/
+  throw (LLDouble::MinusToNegExc) {
   *this = *this - rhs;
   return *this;
 }/*}}}*/
@@ -145,9 +192,15 @@ LLDouble& LLDouble::operator*=(const LLDouble& rhs) {/*{{{*/
   return *this;
 }/*}}}*/
 
-LLDouble& LLDouble::operator/=(const LLDouble& rhs) {/*{{{*/
+LLDouble& LLDouble::operator/=(const LLDouble& rhs) /*{{{*/
+  throw (LLDouble::DivideByZeroExc) {
   *this = *this / rhs;
   return *this;
+}/*}}}*/
+
+bool LLDouble::iszero() const {/*{{{*/
+  if (_type == LINDOMAIN) return _val < MINLINARG;
+  else return _val < LSMALL;
 }/*}}}*/
 
 

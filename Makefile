@@ -4,7 +4,7 @@ CXXFLAGS = -Iinclude -I../libatlas_wrapper/include -I../anguso_arg_parser/includ
 
 MACHINE = $(shell uname -m)
 
-SRC = logarithmatics.cpp
+SRC = logarithmetics.cpp labfile.cpp
 OBJ = $(addprefix obj/$(MACHINE)/,$(SRC:.cpp=.o))
 
 TARGET = lib/$(MACHINE)/libhmmlite.a

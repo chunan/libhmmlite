@@ -18,7 +18,7 @@ LDPATH = -L/home/ugoc/lib -L/usr/lib
 main: main.cpp
 	${CC} ${CFLAGS} $(LDPATH) $< ${LDFLAGS} -o $@
 
-test_logarithmatics: test_logarithmatics.cpp
+test_logarithmetics: test_logarithmetics.cpp
 	${CC} ${CFLAGS} $(LDPATH) $< ${LDFLAGS} -o $@
 
 clean:

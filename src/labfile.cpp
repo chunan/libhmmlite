@@ -1,3 +1,19 @@
+#include <fstream>
+#include "labfile.h"
+#include "utility.h"
+
+using std::ofstream;
+using std::ifstream;
+using std::cout;
+
+void Labfile::SaveLab(string filename) const {/*{{{*/
+  ofstream fs(filename.c_str());
+  if (fs.fail()) {
+    ErrorExit(__FILE__, __LINE__, -1, "unable to open file %s\n",
+              filename.c_str());
+  }
+  SaveLab(fs);
+}/*}}}*/
 
 void Labfile::LoadFile(string filename) {/*{{{*/
   s_fname = filename;
@@ -162,5 +178,39 @@ void Labfile::parseStateSeq(vector<int> &state_seq, vector<int> &ref_end_f) {/*{
 
 } /*}}}*/
 
+void Labfile::DumpData(int start, int last) const {/*{{{*/
+  if (start < 0 || start >= num_lab)
+    start = 0;
+  if (last < 0 || last >= num_lab)
+    last = num_lab - 1;
 
+  cout << "====== Labfile.DumpData() ======\n";
+  for(int i = start; i <= last; i++) {
+    cout << i << ": "
+      << start_f[i] << " "
+      << end_f[i] << ' '
+      << cluster[i] << ' ';
+    if (!score.empty()) cout << score[i];
+    cout << endl;
+  }
+  cout << "num_lab: " << last - start + 1 << endl;
+}/*}}}*/
+
+void Labfile::DumpData(vector<int> &seg_head_state,/*{{{*/
+                       vector<int> &seg_tail_state) const {
+  assert(seg_head_state.size() == seg_tail_state.size());
+  cout << "====== Labfile ======\n";
+  for(unsigned s = 0; s < seg_head_state.size(); s++) {
+    for(int i = seg_head_state[s]; i <= seg_tail_state[s]; i++) {
+      cout << "S" << i << "\ts" << start_f[i] << "\te" << end_f[i] << '\t' << cluster[i] << "\tSeg" << s << endl;
+    }
+  }
+  cout << "num_lab: " << num_lab << endl;
+}/*}}}*/
+
+void Labfile::expandMaxClust(unsigned *p_max_clust) {/*{{{*/
+  for(unsigned i = 0; i < cluster.size(); i++)
+    if(static_cast<unsigned>(cluster[i]) >= *p_max_clust)
+      *p_max_clust = cluster[i]+1;
+}/*}}}*/
 
